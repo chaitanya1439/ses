@@ -1,0 +1,22 @@
+<YOUR_GITHUB_TOKEN>
+
+
+
+
+
+
+
+
+git clone https://<YOUR_GITHUB_TOKEN>@github.com/chaitanya1439/ridesocket.git
+
+git clone https://<YOUR_GITHUB_TOKEN>@github.com/chaitanya1439/ridedriver.git
+
+git remote set-url origin https://<YOUR_GITHUB_TOKEN>@github.com/chaitanya1439/callidusai.git
+
+
+git remote set-url origin https://<YOUR_GITHUB_TOKEN>@github.com/chaitanya1439/two.git
+
+git clone https://<YOUR_GITHUB_TOKEN>@github.com/chaitanya1439/ride.git
+
+
+git remote set-url origin https://<YOUR_GITHUB_TOKEN>@github.com/chaitanya1439/ses.git
