@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "988601448079",
+    "project_id": "fengshui-a8b39",
+    "storage_bucket": "fengshui-a8b39.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:988601448079:android:8e1313401cf24bae4ca2fa",
+        "android_client_info": {
+          "package_name": "com.ridedriver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBjRxlFGA4zylwXqs0lkdcxT3vtnNNVKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

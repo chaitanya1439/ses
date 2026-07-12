@@ -1,0 +1,160 @@
+import { Tabs, Redirect } from "expo-router";
+import { StyleSheet, View, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { theme } from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext";
+
+
+
+function ClassicTabLayout() {
+  const insets = useSafeAreaInsets();
+  // Ensure at least 8px padding below the tabs, plus the system nav inset
+  const bottomPadding = Math.max(insets.bottom, 8);
+  const tabContentHeight = 48; // fixed height for the tab content area
+  const totalHeight = tabContentHeight + bottomPadding;
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.text,
+        tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 0,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          height: totalHeight,
+          paddingBottom: bottomPadding,
+        },
+        tabBarItemStyle: {
+          height: tabContentHeight,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+      }}
+    >
+      {/* HOME TAB */}
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.homeTab}>
+              <Ionicons
+                name={focused ? "home" : "home-outline"}
+                size={22}
+                color={focused ? theme.colors.text : theme.colors.textMuted}
+              />
+              <Text style={[
+                styles.homeLabel,
+                { color: focused ? theme.colors.text : theme.colors.textMuted }
+              ]}>
+                Home
+              </Text>
+            </View>
+          ),
+        }}
+      />
+
+      {/* ORDERS TAB — pill */}
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: "Orders",
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.ordersPill, focused && styles.ordersPillActive]}>
+              <Ionicons
+                name={focused ? "list" : "list-outline"}
+                size={16}
+                color={focused ? theme.colors.text : theme.colors.textMuted}
+              />
+              <Text style={[
+                styles.ordersLabel,
+                { color: focused ? theme.colors.text : theme.colors.textMuted }
+              ]}>
+                Orders
+              </Text>
+            </View>
+          ),
+        }}
+      />
+
+      {/* Hidden tabs */}
+      <Tabs.Screen
+        name="earnings"
+        options={{
+          title: "Earnings",
+          href: null,
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="cash" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          href: null,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-outline" size={24} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  const { driver } = useAuth();
+  
+  // Wait for driver state to be initialized
+  if (!driver) return null;
+  
+  if (!driver.isVerified) {
+    return <Redirect href={"/onboarding" as any} />;
+  }
+
+  return <ClassicTabLayout />;
+}
+
+const styles = StyleSheet.create({
+  homeTab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  homeLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  ordersPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  ordersPillActive: {
+    backgroundColor: '#EEEEEE',
+  },
+  ordersLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+});

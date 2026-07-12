@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "105970813749",
+    "project_id": "ride-95f8e",
+    "storage_bucket": "ride-95f8e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105970813749:android:fe7d24e45ae958ed44da7c",
+        "android_client_info": {
+          "package_name": "com.ridego"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbp0bZYUlrRb7D6wBrsqenIMKTatV-l-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
