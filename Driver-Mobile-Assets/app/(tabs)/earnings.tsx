@@ -88,8 +88,19 @@ export default function EarningsScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <Text style={styles.cardLabel}>Total Earnings</Text>
-          <Text style={styles.cardAmount}>₹{displayEarnings.toLocaleString('en-IN')}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View>
+              <Text style={styles.cardLabel}>Total Earnings</Text>
+              <Text style={styles.cardAmount}>₹{displayEarnings.toLocaleString('en-IN')}</Text>
+            </View>
+            <Pressable
+              style={styles.rateCardBtn}
+              onPress={() => router.push('/rate-card' as any)}
+            >
+              <MaterialCommunityIcons name="text-box-search-outline" size={16} color={theme.colors.dark} />
+              <Text style={styles.rateCardText}>Rate Card</Text>
+            </Pressable>
+          </View>
           <View style={styles.cardRow}>
             <View style={styles.cardStat}>
               <MaterialCommunityIcons name="motorbike" size={16} color={theme.colors.dark + 'CC'} />
@@ -234,6 +245,15 @@ const styles = StyleSheet.create({
   },
   cardRow: { flexDirection: 'row', gap: 16, marginTop: 4 },
   cardStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rateCardBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 12,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  rateCardText: {
+    fontSize: 12, fontWeight: '600', color: theme.colors.dark,
+    fontFamily: 'Poppins_600SemiBold',
+  },
   cardStatText: {
     fontSize: 13, color: theme.colors.dark + 'CC',
     fontFamily: 'Poppins_400Regular',

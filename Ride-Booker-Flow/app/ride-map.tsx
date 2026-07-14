@@ -262,7 +262,7 @@ export default function RideMapScreen() {
             </BottomSheetScrollView>
 
             <View style={s.promoBanner}>
-              <LinearGradient colors={['#FDF4FF', '#FCE7F3']} style={StyleSheet.absoluteFillObject} />
+              <LinearGradient colors={['#FDF4FF', '#FCE7F3']} style={StyleSheet.absoluteFill} />
               <MaterialCommunityIcons name="star-shooting" size={24} color="#DB2777" />
               <Text style={s.promoText} numberOfLines={1}>Earn 10% back on every ride with Pro.</Text>
               <Ionicons name="chevron-forward" size={20} color="#DB2777" />
