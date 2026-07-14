@@ -12,6 +12,7 @@ import { Colors } from "@/constants/colors";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { useBooking } from "@/contexts/BookingContext";
 import { customMapStyle } from "@/constants/mapStyle";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 
 const { height } = Dimensions.get("window");
 
@@ -172,18 +173,16 @@ export default function HomeScreen() {
       </View>
 
       {/* Scrollable Bottom Sheet Overlay */}
-      <ScrollView
-        style={StyleSheet.absoluteFill}
-        contentContainerStyle={{ paddingTop: height * 0.45, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-        pointerEvents="box-none"
+      <BottomSheet
+        snapPoints={["50%", "90%"]}
+        index={0}
+        handleIndicatorStyle={{ backgroundColor: Colors.border, width: 40, height: 4 }}
+        backgroundStyle={{ backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, shadowColor: Colors.black, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 16, elevation: 10 }}
       >
-        <View style={styles.bottomSheet} pointerEvents="auto">
-          {/* Handle bar */}
-          <View style={styles.handleBarWrap}>
-             <View style={styles.handleBar} />
-          </View>
-
+        <BottomSheetScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.greetingTitle}>Where to?</Text>
 
           {/* Search Bar */}
@@ -249,8 +248,8 @@ export default function HomeScreen() {
             </View>
           </View>
 
-        </View>
-      </ScrollView>
+        </BottomSheetScrollView>
+      </BottomSheet>
 
       {/* Floating Bottom Nav */}
       <View style={[styles.bottomNavOuter, { paddingBottom: Platform.OS === "web" ? 16 : Math.max(insets.bottom, 8) }]}>

@@ -13,6 +13,7 @@ import { useBooking } from "@/contexts/BookingContext";
 import { useFareCalculator, VehicleOption } from "@/hooks/useFareCalculator";
 import { customMapStyle } from "@/constants/mapStyle";
 import { LinearGradient } from "expo-linear-gradient";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 
 // ─── Skeleton shimmer ────────────────────────────────────────────────
 function Shimmer({ w, h, r = 6, style }: { w: number | string; h: number; r?: number; style?: object }) {
@@ -85,25 +86,6 @@ export default function RideMapScreen() {
   const { pickup, drop, setSelectedVehicle, setFare, setRouteDetails } = useBooking();
   const [selectedId, setSelectedId] = useState("auto");
   const mapRef = useRef<MapView>(null);
-
-  const sheetSlide = useRef(new Animated.Value(200)).current;
-  const sheetFade = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(sheetSlide, {
-        toValue: 0,
-        duration: 600,
-        easing: Easing.out(Easing.exp),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      })
-    ]).start();
-  }, []);
 
   const pickupCoords = useMemo(() => (pickup?.lat && pickup?.lng ? { latitude: pickup.lat, longitude: pickup.lng } : null), [pickup]);
   const destCoords = useMemo(() => (drop?.lat && drop?.lng ? { latitude: drop.lat, longitude: drop.lng } : null), [drop]);
@@ -222,10 +204,15 @@ export default function RideMapScreen() {
       </View>
 
       {/* ═══ BOTTOM SHEET ═════════════════════════════════════════ */}
-      <Animated.View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 24), transform: [{ translateY: sheetSlide }], opacity: sheetFade }]}>
+      <BottomSheet
+        snapPoints={["40%", "80%"]}
+        index={0}
+        handleIndicatorStyle={{ backgroundColor: "#E5E7EB", width: 40, height: 5 }}
+        backgroundStyle={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: "#000", shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 20 }}
+      >
+        <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 24) }}>
         {isLoading ? (
           <>
-            <View style={s.sheetHandle} />
             <Text style={s.sheetTitle}>Finding rides for you...</Text>
             <ProgressBar />
             <View style={{ height: 20 }} />
@@ -233,10 +220,9 @@ export default function RideMapScreen() {
           </>
         ) : (
           <>
-            <View style={s.sheetHandle} />
             <Text style={s.sheetTitle}>Choose a ride</Text>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280, marginTop: 12 }}>
+            <BottomSheetScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280, marginTop: 12 }}>
               {vehicles.map((v) => {
                 const isSelected = v.id === selectedId;
                 return (
@@ -273,7 +259,7 @@ export default function RideMapScreen() {
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </BottomSheetScrollView>
 
             <View style={s.promoBanner}>
               <LinearGradient colors={['#FDF4FF', '#FCE7F3']} style={StyleSheet.absoluteFillObject} />
@@ -304,7 +290,8 @@ export default function RideMapScreen() {
             </View>
           </>
         )}
-      </Animated.View>
+        </View>
+      </BottomSheet>
     </View>
   );
 }
