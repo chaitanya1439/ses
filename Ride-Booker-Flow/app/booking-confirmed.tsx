@@ -22,6 +22,7 @@ import ShareTripModal from "@/components/ShareTripModal";
 import { mockDriver, vehicleOptions } from "@/constants/mockData";
 import { fetchDirectionsPolyline } from "@/lib/googleMaps";
 import { customMapStyle } from "@/constants/mapStyle";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ export default function BookingConfirmedScreen() {
     lng?: number;
   } | null>(
     initPayload ? {
-      name: initPayload.driverName || initPayload.driverId || "Your Driver",
+      name: initPayload.driverName || (initPayload.driverId ? `Driver #${initPayload.driverId.substring(0,4)}` : "Your Driver"),
       rating: initPayload.rating || 4.9,
       plateNumber: initPayload.plate || "TG 09 A 1234",
       otp: initPayload.otp || "1234",
@@ -361,7 +362,7 @@ export default function BookingConfirmedScreen() {
         if (cancelled) return;
         console.log("Ride accepted by driver!", payload);
         setDriverDetails({
-          name: payload.driverName || payload.driverId || "Your Driver",
+          name: payload.driverName || (payload.driverId ? `Driver #${payload.driverId.substring(0,4)}` : "Your Driver"),
           rating: payload.rating || 4.9,
           plateNumber: payload.plate || "TG 09 A 1234",
           otp: payload.otp || "1234",
@@ -610,144 +611,148 @@ export default function BookingConfirmedScreen() {
         )}
       </View>
 
-      {/* ── Searching Phase Bottom Sheet ── */}
-      {!isConfirmed && (
-        <View style={[styles.bottomSheet, { paddingBottom: insets.bottom + 20 }]}>
-          <View style={styles.searchingContainer}>
-            <View style={styles.searchingIconBox}>
-              <MaterialCommunityIcons
-                name="radar"
-                size={32}
-                color={Colors.primary}
-              />
+      {/* ── Unified Bottom Sheet ── */}
+      <BottomSheet
+        snapPoints={isConfirmed ? ["45%", "65%", "90%"] : ["30%"]}
+        index={0}
+        handleIndicatorStyle={{ backgroundColor: Colors.mediumGrey, width: 40 }}
+        backgroundStyle={styles.bottomSheetBackground}
+      >
+        <BottomSheetScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 20 }}>
+          {!isConfirmed ? (
+            <View style={styles.searchingContainer}>
+              <View style={styles.searchingIconBox}>
+                <MaterialCommunityIcons
+                  name="radar"
+                  size={32}
+                  color={Colors.primary}
+                />
+              </View>
+              <Text style={styles.searchingTitle}>
+                Looking for nearby drivers...
+              </Text>
+              <Text style={styles.searchingSubtitle}>
+                Contacting {vehicle?.name ?? "drivers"} near your pickup point.
+                This usually takes just a few seconds.
+              </Text>
+              <Pressable style={styles.cancelRequestBtn} onPress={handleCancel}>
+                <Text style={styles.cancelRequestText}>Cancel Request</Text>
+              </Pressable>
             </View>
-            <Text style={styles.searchingTitle}>
-              Looking for nearby drivers...
-            </Text>
-            <Text style={styles.searchingSubtitle}>
-              Contacting {vehicle?.name ?? "drivers"} near your pickup point.
-              This usually takes just a few seconds.
-            </Text>
-            <Pressable style={styles.cancelRequestBtn} onPress={handleCancel}>
-              <Text style={styles.cancelRequestText}>Cancel Request</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-
-      {/* ── Confirmed Phase Bottom Sheet ── */}
-      {isConfirmed && (
-        <View style={[styles.bottomSheet, { paddingBottom: insets.bottom + 12 }]}>
-          {/* Status steps */}
-          <View style={styles.statusContainer}>
-            {STATUS_STEPS.map((step, index) => (
-              <View key={step} style={styles.statusStep}>
-                <View
+          ) : (
+            <>
+              {/* Status steps */}
+              <View style={styles.statusContainer}>
+                {STATUS_STEPS.map((step, index) => (
+                  <View key={step} style={styles.statusStep}>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        index <= currentStep && styles.statusDotActive,
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.statusLabel,
+                        index === currentStep && styles.statusLabelActive,
+                      ]}
+                    >
+                      {step}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.progressTrack}>
+                <RNAnimated.View
                   style={[
-                    styles.statusDot,
-                    index <= currentStep && styles.statusDotActive,
+                    styles.progressFill,
+                    {
+                      width: progressAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["0%", "100%"],
+                      }),
+                    },
                   ]}
                 />
-                <Text
-                  style={[
-                    styles.statusLabel,
-                    index === currentStep && styles.statusLabelActive,
-                  ]}
+              </View>
+
+              {/* Driver card */}
+              <View style={styles.driverCardUber}>
+                <View style={styles.driverTopRow}>
+                  <View style={styles.driverPhotoWrap}>
+                    <View style={[styles.driverPhoto, styles.driverPhotoPlaceholder]}>
+                      <Ionicons name="person" size={28} color="#9CA3AF" />
+                    </View>
+                    <View style={styles.ratingBadge}>
+                      <Ionicons name="star" size={10} color="#FFB800" />
+                      <Text style={styles.ratingText}>{driverDetails?.rating || 4.9}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.vehicleImgBox}>
+                     {renderVehicleIcon(36, Colors.dark)}
+                  </View>
+                  <View style={styles.driverInfoRight}>
+                    <Text style={styles.plateLarge}>{driverDetails?.plateNumber || "TG 09 A 1234"}</Text>
+                    <Text style={styles.vehicleName}>{vehicle?.name ?? "Honda Shine"}</Text>
+                  </View>
+                </View>
+                <Text style={styles.driverNameLarge}>{driverDetails?.name?.toUpperCase() || "YOUR DRIVER"}</Text>
+                
+                <View style={styles.otpBanner}>
+                  <Text style={styles.otpBannerLabel}>PIN for this ride</Text>
+                  <Text style={styles.otpBannerValue}>{driverDetails?.otp || "1234"}</Text>
+                </View>
+              </View>
+
+              {!isOtpVerified && (
+                <Pressable 
+                  style={[styles.cancelRequestBtn, { backgroundColor: Colors.primary, marginBottom: 16 }]} 
+                  onPress={() => setIsOtpVerified(true)}
                 >
-                  {step}
-                </Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.progressTrack}>
-            <RNAnimated.View
-              style={[
-                styles.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["0%", "100%"],
-                  }),
-                },
-              ]}
-            />
-          </View>
+                  <Text style={[styles.cancelRequestText, { color: Colors.white }]}>Verify OTP & Start Trip</Text>
+                </Pressable>
+              )}
 
-          {/* Driver card */}
-          <View style={styles.driverCardUber}>
-            <View style={styles.driverTopRow}>
-              <View style={styles.driverPhotoWrap}>
-                <View style={[styles.driverPhoto, styles.driverPhotoPlaceholder]}>
-                  <Ionicons name="person" size={28} color="#9CA3AF" />
-                </View>
-                <View style={styles.ratingBadge}>
-                  <Ionicons name="star" size={10} color="#FFB800" />
-                  <Text style={styles.ratingText}>{driverDetails?.rating || 4.9}</Text>
-                </View>
+              {/* Action buttons */}
+              <View style={styles.actionRowUber}>
+                <Pressable
+                  style={styles.msgBtnUber}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setChatVisible(true);
+                  }}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color={Colors.white} />
+                  <Text style={styles.msgBtnTextUber}>Message</Text>
+                </Pressable>
+                <Pressable style={styles.iconBtnUber}>
+                  <Ionicons name="call-outline" size={20} color={Colors.dark} />
+                </Pressable>
+                <Pressable style={styles.iconBtnUberSos}>
+                  <Ionicons name="shield-outline" size={20} color={Colors.white} />
+                  <Text style={styles.sosTextUber}>SOS</Text>
+                </Pressable>
               </View>
-              <View style={styles.vehicleImgBox}>
-                 {renderVehicleIcon(36, Colors.dark)}
-              </View>
-              <View style={styles.driverInfoRight}>
-                <Text style={styles.plateLarge}>{driverDetails?.plateNumber || "TG 09 A 1234"}</Text>
-                <Text style={styles.vehicleName}>{vehicle?.name ?? "Honda Shine"}</Text>
-              </View>
-            </View>
-            <Text style={styles.driverNameLarge}>{driverDetails?.name?.toUpperCase() || "YOUR DRIVER"}</Text>
-            
-            <View style={styles.otpBanner}>
-              <Text style={styles.otpBannerLabel}>PIN for this ride</Text>
-              <Text style={styles.otpBannerValue}>{driverDetails?.otp || "1234"}</Text>
-            </View>
-          </View>
+              
+              {/* Share Trip Status Button */}
+              {isConfirmed && currentStep < 2 && (
+                <Pressable 
+                  style={[styles.cancelBtn, { marginTop: 12, backgroundColor: Colors.surfaceMuted, borderColor: Colors.border, borderWidth: 1, borderRadius: 14 }]} 
+                  onPress={() => setShareVisible(true)}
+                >
+                  <Text style={[styles.cancelBtnText, { color: Colors.dark }]}>Share trip status</Text>
+                </Pressable>
+              )}
 
-          {!isOtpVerified && (
-            <Pressable 
-              style={[styles.cancelRequestBtn, { backgroundColor: Colors.primary, marginBottom: 16 }]} 
-              onPress={() => setIsOtpVerified(true)}
-            >
-              <Text style={[styles.cancelRequestText, { color: Colors.white }]}>Verify OTP & Start Trip</Text>
-            </Pressable>
+              {canCancel && (
+                <Pressable style={styles.cancelBtn} onPress={handleCancel}>
+                  <Text style={styles.cancelBtnText}>Cancel Ride</Text>
+                </Pressable>
+              )}
+            </>
           )}
-
-          {/* Action buttons */}
-          <View style={styles.actionRowUber}>
-            <Pressable
-              style={styles.msgBtnUber}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setChatVisible(true);
-              }}
-            >
-              <Ionicons name="chatbubble-outline" size={18} color={Colors.white} />
-              <Text style={styles.msgBtnTextUber}>Message</Text>
-            </Pressable>
-            <Pressable style={styles.iconBtnUber}>
-              <Ionicons name="call-outline" size={20} color={Colors.dark} />
-            </Pressable>
-            <Pressable style={styles.iconBtnUberSos}>
-              <Ionicons name="shield-outline" size={20} color={Colors.white} />
-              <Text style={styles.sosTextUber}>SOS</Text>
-            </Pressable>
-          </View>
-          
-          {/* Share Trip Status Button */}
-          {isConfirmed && currentStep < 2 && (
-            <Pressable 
-              style={[styles.cancelBtn, { marginTop: 12, backgroundColor: Colors.surfaceMuted, borderColor: Colors.border, borderWidth: 1 }]} 
-              onPress={() => setShareVisible(true)}
-            >
-              <Text style={[styles.cancelBtnText, { color: Colors.dark }]}>Share trip status</Text>
-            </Pressable>
-          )}
-
-          {canCancel && (
-            <Pressable style={styles.cancelBtn} onPress={handleCancel}>
-              <Text style={styles.cancelBtnText}>Cancel Ride</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
+        </BottomSheetScrollView>
+      </BottomSheet>
 
 
       {chatVisible && (
@@ -842,16 +847,14 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_600SemiBold",
     color: Colors.dark,
   },
-  bottomSheet: {
+  bottomSheetBackground: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderRadius: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 12,
   },
   searchingContainer: {
     alignItems: "center",
@@ -968,8 +971,9 @@ const styles = StyleSheet.create({
   },
 
   driverCardUber: {
-    backgroundColor: Colors.white, borderRadius: 24, borderWidth: 1.5, borderColor: Colors.dark,
+    backgroundColor: Colors.white, borderRadius: 24, borderWidth: 1, borderColor: Colors.border,
     padding: 20, marginBottom: 16,
+    shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
   },
   driverTopRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   driverPhotoWrap: { position: "relative" },
@@ -992,10 +996,11 @@ const styles = StyleSheet.create({
   driverNameLarge: { fontSize: 16, fontFamily: "Poppins_700Bold", color: Colors.dark, marginTop: 16, letterSpacing: 1 },
   otpBanner: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: Colors.lightGrey, borderRadius: 12, padding: 12, marginTop: 16,
+    backgroundColor: Colors.primary + "1A", borderRadius: 12, padding: 16, marginTop: 16,
+    borderWidth: 1, borderColor: Colors.primary + "33",
   },
   otpBannerLabel: { fontSize: 14, fontFamily: "Poppins_600SemiBold", color: Colors.darkSecondary },
-  otpBannerValue: { fontSize: 20, fontFamily: "Poppins_700Bold", color: Colors.dark, letterSpacing: 4 },
+  otpBannerValue: { fontSize: 24, fontFamily: "Poppins_700Bold", color: Colors.dark, letterSpacing: 6 },
   
   actionRowUber: { flexDirection: "row", gap: 12, marginBottom: 16 },
   msgBtnUber: {

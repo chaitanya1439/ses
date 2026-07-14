@@ -61,9 +61,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
         return;
       }
 
-      // Pass token in URL for HTTP Upgrade authentication
-      const urlWithAuth = token ? `${PUBLIC_WEBSOCKET_URL}?token=${encodeURIComponent(token)}` : PUBLIC_WEBSOCKET_URL;
-      const ws = new WebSocket(urlWithAuth);
+      // Connect without token in URL — auth is handled via the post-connect 'auth' message
+      const ws = new WebSocket(PUBLIC_WEBSOCKET_URL);
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -109,10 +108,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
       };
 
       ws.onerror = (error) => {
-        console.error('[Socket] Error: WebSocket connection failed', {
-          url: ws.url,
+        console.warn('[Socket] Connection issue — will retry', {
           readyState: ws.readyState,
-          type: error.type,
         });
         ws.close();
       };

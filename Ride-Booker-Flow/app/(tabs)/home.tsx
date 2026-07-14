@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable, StatusBar, Platform, Animated, Easing, Dimensions
 } from "react-native";
 import { router } from "expo-router";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, AnimatedRegion, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons, Feather, FontAwesome5 } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -11,6 +11,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors } from "@/constants/colors";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { useBooking } from "@/contexts/BookingContext";
+import { useSocket } from "@/contexts/SocketContext";
+import { BikeIcon, AutoIcon } from "@/components/VehicleIcons";
 import { customMapStyle } from "@/constants/mapStyle";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 
@@ -80,6 +82,73 @@ export default function HomeScreen() {
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<BottomTab>("home");
+  
+  const { subscribe } = useSocket();
+  const [nearbyDrivers, setNearbyDrivers] = useState<Record<string, any>>({});
+  const driverAnimations = useRef<Record<string, AnimatedRegion>>({});
+
+  useEffect(() => {
+    const unsubscribe = subscribe('driver_location_changed', (payload) => {
+      const { driverId, location } = payload;
+      const { latitude, longitude, heading, vehicleType } = location;
+
+      setNearbyDrivers((prev) => ({
+        ...prev,
+        [driverId]: { driverId, latitude, longitude, heading, vehicleType, lastUpdatedAt: Date.now() }
+      }));
+
+      if (driverAnimations.current[driverId]) {
+        (driverAnimations.current[driverId].timing as any)({
+          latitude,
+          longitude,
+          duration: 2500,
+          useNativeDriver: false
+        }).start();
+      } else {
+        driverAnimations.current[driverId] = new AnimatedRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0,
+          longitudeDelta: 0
+        });
+      }
+    });
+
+    // Handle offline event
+    const unsubOffline = subscribe('driver_offline', (payload) => {
+      const { driverId } = payload;
+      setNearbyDrivers((prev) => {
+        const updated = { ...prev };
+        delete updated[driverId];
+        delete driverAnimations.current[driverId];
+        return updated;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      unsubOffline();
+    };
+  }, [subscribe]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setNearbyDrivers((prev) => {
+        let changed = false;
+        const updated = { ...prev };
+        Object.keys(updated).forEach(id => {
+          if (now - updated[id].lastUpdatedAt > 25000) {
+            delete updated[id];
+            delete driverAnimations.current[id];
+            changed = true;
+          }
+        });
+        return changed ? updated : prev;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Pulse animation for marker
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -139,6 +208,7 @@ export default function HomeScreen() {
       <View style={StyleSheet.absoluteFill}>
         {Platform.OS !== "web" ? (
           <MapView
+            provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
             initialRegion={{
               latitude: location.coords?.latitude ?? 17.385,
@@ -150,13 +220,30 @@ export default function HomeScreen() {
             showsCompass={false}
           >
             {location.coords && (
-              <Marker coordinate={{ latitude: location.coords.latitude, longitude: location.coords.longitude }}>
+              <Marker coordinate={{ latitude: location.coords.latitude, longitude: location.coords.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
                 <View style={{ alignItems: "center", justifyContent: "center" }}>
                   <Animated.View style={[styles.userDot, { position: "absolute", opacity: 0.2, transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 3] }) }] }]} />
                   <View style={styles.userDot} />
                 </View>
               </Marker>
             )}
+
+            {/* Render Nearby Drivers */}
+            {Object.values(nearbyDrivers).map((driver) => {
+              const animRegion = driverAnimations.current[driver.driverId];
+              if (!animRegion) return null;
+              
+              return (
+                <Marker.Animated
+                  key={driver.driverId}
+                  coordinate={animRegion as any}
+                  rotation={driver.heading || 0}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                >
+                  {driver.vehicleType === 'moto' ? <BikeIcon width={32} height={32} /> : <AutoIcon width={32} height={32} />}
+                </Marker.Animated>
+              );
+            })}
           </MapView>
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.lightGrey, alignItems: 'center', justifyContent: 'center' }]}>

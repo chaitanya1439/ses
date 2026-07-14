@@ -12,6 +12,8 @@ function getPublicWebSocketUrl() {
     return process.env.EXPO_PUBLIC_SOCKET_URL;
   }
 
+  // Use local dev server only when explicitly running one on port 5000.
+  // Default to production WebSocket for all environments.
   return "wss://real.shelteric.com";
 }
 
