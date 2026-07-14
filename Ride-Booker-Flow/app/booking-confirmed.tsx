@@ -97,6 +97,7 @@ export default function BookingConfirmedScreen() {
   const [etaRemaining, setEtaRemaining] = useState(5);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [driverDetails, setDriverDetails] = useState<{
+    id?: string;
     name: string;
     rating: number;
     plateNumber: string;
@@ -105,6 +106,7 @@ export default function BookingConfirmedScreen() {
     lng?: number;
   } | null>(
     initPayload ? {
+      id: initPayload.driverId || initPayload.driverName || 'driver',
       name: initPayload.driverName || (initPayload.driverId ? `Driver #${initPayload.driverId.substring(0,4)}` : "Your Driver"),
       rating: initPayload.rating || 4.9,
       plateNumber: initPayload.plate || "TG 09 A 1234",
@@ -363,6 +365,7 @@ export default function BookingConfirmedScreen() {
         if (cancelled) return;
         console.log("Ride accepted by driver!", payload);
         setDriverDetails({
+          id: payload.driverId || payload.driverName || 'driver',
           name: payload.driverName || (payload.driverId ? `Driver #${payload.driverId.substring(0,4)}` : "Your Driver"),
           rating: payload.rating || 4.9,
           plateNumber: payload.plate || "TG 09 A 1234",
@@ -767,7 +770,7 @@ export default function BookingConfirmedScreen() {
       <ChatModal 
         visible={chatVisible} 
         onClose={() => setChatVisible(false)} 
-        targetId={driverDetails?.name || 'driver'} 
+        targetId={driverDetails?.id || 'driver'} 
         driverName={driverDetails?.name} 
       />
 

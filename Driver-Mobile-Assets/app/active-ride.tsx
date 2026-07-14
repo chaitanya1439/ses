@@ -12,6 +12,7 @@ import ChatModal from '@/components/ChatModal';
 import { openGoogleMapsNavigation } from '@/utils/maps';
 import { RideMap } from '@/components/RideMap';
 import { theme } from '@/constants/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { TextInput, KeyboardAvoidingView } from 'react-native';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -20,25 +21,25 @@ const STEP_CONFIG = {
   navigate: {
     label: 'Navigate to Pickup',
     icon: 'navigate',
-    color: theme.colors.primary,
-    textColor: theme.colors.dark,
+    gradient: ['#F59E0B', '#D97706'], // Vibrant Yellow/Orange
+    textColor: '#FFF',
   },
   arrived: {
     label: 'Start Ride',
     icon: 'play',
-    color: theme.colors.success,
+    gradient: ['#10B981', '#059669'], // Emerald Green
     textColor: '#FFF',
   },
   started: {
     label: 'Complete Ride',
     icon: 'flag',
-    color: theme.colors.danger,
+    gradient: ['#4F46E5', '#4338CA'], // Indigo
     textColor: '#FFF',
   },
   completed: {
     label: 'Ride Completed',
     icon: 'checkmark-circle',
-    color: theme.colors.success,
+    gradient: ['#10B981', '#059669'],
     textColor: '#FFF',
   },
 };
@@ -132,99 +133,109 @@ export default function ActiveRideScreen() {
           dropLng={drop.lng}
         />
 
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
-        </Pressable>
-
-        <View style={styles.rideStatusBadge}>
-          <View style={[styles.statusDot, { backgroundColor: activeRideStep === 'started' ? theme.colors.success : theme.colors.primary }]} />
-          <Text style={styles.statusText}>{statusLabel}</Text>
+        {/* Top Controls Overlay */}
+        <View style={styles.topControls}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </Pressable>
+          <View style={styles.rideStatusBadge}>
+            <View style={[styles.statusDot, { backgroundColor: activeRideStep === 'started' ? '#10B981' : '#F59E0B' }]} />
+            <Text style={styles.statusText}>{statusLabel}</Text>
+          </View>
         </View>
       </View>
 
-      <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom, 24) }]}>
         <View style={styles.sheetHandle} />
 
+        {/* Rider Profile Section */}
         <View style={styles.customerRow}>
           <View style={styles.customerAvatar}>
-            <MaterialCommunityIcons name="account" size={28} color={theme.colors.primary} />
+            <Text style={styles.avatarText}>{activeRide.customer.name.charAt(0).toUpperCase()}</Text>
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={styles.customerInfo}>
             <Text style={styles.customerName}>{activeRide.customer.name}</Text>
             <View style={styles.starsRow}>
-              {stars.map((filled, i) => (
-                <Ionicons key={i} name={filled ? 'star' : 'star-outline'} size={12} color={theme.colors.primary} />
-              ))}
-              <Text style={styles.ratingText}>{activeRide.customer.rating}</Text>
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.ratingText}>{activeRide.customer.rating} <Text style={{color: '#9CA3AF'}}>• Rider</Text></Text>
             </View>
           </View>
-          <Pressable style={styles.callBtn} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
-            <Ionicons name="call" size={20} color="#FFF" />
-          </Pressable>
-          <Pressable style={styles.msgBtn} onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setChatVisible(true);
-          }}>
-            <Ionicons name="chatbubble" size={20} color={theme.colors.dark} />
-          </Pressable>
+          <View style={styles.contactActions}>
+            <Pressable style={[styles.contactBtn, { backgroundColor: '#ECFDF5' }]} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+              <Ionicons name="call" size={20} color="#10B981" />
+            </Pressable>
+            <Pressable style={[styles.contactBtn, { backgroundColor: '#EFF6FF' }]} onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setChatVisible(true);
+            }}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#3B82F6" />
+            </Pressable>
+          </View>
         </View>
 
-        <View style={styles.locationCard}>
-          <View style={styles.locationRow}>
-            <View style={[styles.locationDot, { backgroundColor: theme.colors.success }]} />
-            <View style={{ flex: 1 }}>
+        {/* Trip Details Section */}
+        <View style={styles.tripDetailsCard}>
+          <View style={styles.timelineContainer}>
+            <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
+            <View style={styles.timelineLine} />
+            <View style={[styles.timelineSquare, { backgroundColor: '#EF4444' }]} />
+          </View>
+          
+          <View style={styles.locationsContainer}>
+            <View style={styles.locationBlock}>
               <Text style={styles.locationLabel}>Pickup</Text>
-              <Text style={styles.locationText}>{pickup.address}</Text>
+              <Text style={styles.locationText} numberOfLines={2}>{pickup.address}</Text>
+            </View>
+            <View style={styles.locationDivider} />
+            <View style={styles.locationBlock}>
+              <Text style={styles.locationLabel}>Dropoff</Text>
+              <Text style={styles.locationText} numberOfLines={2}>{drop.address}</Text>
             </View>
           </View>
-          <View style={styles.locationConnector} />
-          <View style={styles.locationRow}>
-            <View style={[styles.locationDot, { backgroundColor: theme.colors.danger }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.locationLabel}>Drop</Text>
-              <Text style={styles.locationText}>{drop.address}</Text>
+
+          <View style={styles.tripMetaCol}>
+            <View style={styles.fareBadge}>
+              <Text style={styles.fareCurrency}>₹</Text>
+              <Text style={styles.fareAmount}>{activeRide.fare}</Text>
             </View>
-            <View style={styles.fareTag}>
-              <Text style={styles.fareTagText}>₹{activeRide.fare}</Text>
+            <View style={styles.infoChip}>
+              <MaterialCommunityIcons name="map-marker-distance" size={14} color="#6B7280" />
+              <Text style={styles.infoChipText}>{activeRide.distance}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.infoRow}>
-          <View style={styles.infoChip}>
-            <MaterialCommunityIcons name="map-marker-distance" size={16} color={theme.colors.textLight} />
-            <Text style={styles.infoChipText}>{activeRide.distance}</Text>
-          </View>
-          <View style={styles.infoChip}>
-            <MaterialCommunityIcons name="motorbike" size={16} color={theme.colors.textLight} />
-            <Text style={styles.infoChipText}>{activeRide.type}</Text>
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        {/* Main Actions */}
+        <View style={styles.actionContainer}>
           <Pressable
             style={({ pressed }) => [
-              styles.actionBtn,
-              { flex: 1, backgroundColor: stepConfig.color, opacity: pressed || completing ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+              styles.primaryActionWrap,
+              { opacity: pressed || completing ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
             ]}
             onPress={handlePrimaryAction}
             disabled={completing}
           >
-            <Ionicons name={stepConfig.icon as any} size={22} color={stepConfig.textColor} />
-            <Text style={[styles.actionBtnText, { color: stepConfig.textColor }]}>
-              {completing ? 'Completing...' : stepConfig.label}
-            </Text>
+            <LinearGradient 
+              colors={(stepConfig.gradient as unknown as readonly [string, string, ...string[]]) || ['#4F46E5', '#4338CA']} 
+              start={{x: 0, y: 0}} end={{x: 1, y: 1}}
+              style={styles.primaryActionBtn}
+            >
+              <Ionicons name={stepConfig.icon as any} size={24} color="#FFF" />
+              <Text style={styles.primaryActionText}>
+                {completing ? 'Processing...' : stepConfig.label}
+              </Text>
+            </LinearGradient>
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [
-              styles.actionBtn,
-              { width: 56, borderWidth: 1, borderColor: theme.colors.danger, backgroundColor: 'transparent', opacity: pressed || completing ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+              styles.cancelBtn,
+              { opacity: pressed || completing ? 0.8 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
             ]}
             onPress={handleCancelRide}
             disabled={completing}
           >
-            <Ionicons name="close" size={24} color={theme.colors.danger} />
+            <Ionicons name="close" size={26} color="#EF4444" />
           </Pressable>
         </View>
       </View>
@@ -272,209 +283,104 @@ export default function ActiveRideScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.surface },
-  mapWrapper: { height: screenHeight * 0.45, backgroundColor: '#E8F0F8' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  mapWrapper: { flex: 1, backgroundColor: '#E8F0F8', position: 'relative' },
+  
+  // Top Controls Overlay
+  topControls: {
+    position: 'absolute', top: 16, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    zIndex: 10,
+  },
   backBtn: {
-    position: 'absolute', top: 16, left: 16,
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: theme.colors.surface,
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center', alignItems: 'center',
-    ...theme.shadows.card,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
   },
   rideStatusBadge: {
-    position: 'absolute', top: 16, left: 72, right: 16,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
-    ...theme.shadows.card,
+    backgroundColor: '#111827',
+    borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: {
-    fontSize: 13, fontWeight: '600', color: theme.colors.text,
-    fontFamily: 'Poppins_600SemiBold',
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusText: { fontSize: 14, fontFamily: 'Poppins_600SemiBold', color: '#FFFFFF' },
+
+  // Bottom Sheet
+  bottomSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    paddingHorizontal: 24, paddingTop: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 20,
   },
-  bottomCard: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 20, gap: 14,
-    ...theme.shadows.lg,
-  },
-  sheetHandle: {
-    width: 40, height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 4,
-  },
-  customerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sheetHandle: { width: 48, height: 5, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
+  
+  // Rider Profile
+  customerRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 24 },
   customerAvatar: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: theme.colors.primary + '18',
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: '#E5E7EB',
   },
-  customerName: {
-    fontSize: 16, fontWeight: '700', color: theme.colors.text,
-    fontFamily: 'Poppins_700Bold',
-  },
-  starsRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
-  ratingText: {
-    fontSize: 12, color: theme.colors.textLight, marginLeft: 4,
-    fontFamily: 'Poppins_400Regular',
-  },
-  callBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: theme.colors.success,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  msgBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  locationCard: {
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: 16, padding: 16,
-  },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  locationDot: { width: 12, height: 12, borderRadius: 6, flexShrink: 0 },
-  locationConnector: {
-    width: 2, height: 14, backgroundColor: theme.colors.border,
-    marginLeft: 5, marginVertical: 5,
-  },
-  locationLabel: {
-    fontSize: 10, color: theme.colors.textMuted,
-    fontFamily: 'Poppins_400Regular',
-  },
-  locationText: {
-    fontSize: 13, fontWeight: '600', color: theme.colors.text,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  fareTag: {
-    backgroundColor: theme.colors.success + '18',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
-  },
-  fareTagText: {
-    fontSize: 16, fontWeight: '700', color: theme.colors.success,
-    fontFamily: 'Poppins_700Bold',
-  },
-  infoRow: { flexDirection: 'row', gap: 10 },
-  infoChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-  },
-  infoChipText: {
-    fontSize: 13, color: theme.colors.textLight,
-    fontFamily: 'Poppins_400Regular',
-  },
-  actionBtn: {
-    borderRadius: 16, height: 56,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    ...theme.shadows.card,
-  },
-  actionBtnText: {
-    fontSize: 17, fontWeight: '700',
-    fontFamily: 'Poppins_700Bold',
-  },
-  noRideContainer: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14,
-  },
-  noRideTitle: {
-    fontSize: 22, fontWeight: '700', color: theme.colors.textLight,
-    fontFamily: 'Poppins_700Bold',
-  },
-  noRideDesc: {
-    fontSize: 14, color: theme.colors.textMuted,
-    fontFamily: 'Poppins_400Regular', textAlign: 'center', paddingHorizontal: 40,
-  },
-  goHomeBtn: {
-    backgroundColor: theme.colors.primary, borderRadius: 14,
-    paddingHorizontal: 28, paddingVertical: 14, marginTop: 8,
-  },
-  goHomeBtnText: {
-    fontSize: 16, fontWeight: '700', color: theme.colors.dark,
-    fontFamily: 'Poppins_700Bold',
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  otpModalContainer: {
-    width: '80%',
-    backgroundColor: theme.colors.surface,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-  },
-  otpModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    fontFamily: 'Poppins_700Bold',
-    color: theme.colors.text,
-    marginBottom: 8,
-  },
-  otpModalDesc: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    fontFamily: 'Poppins_400Regular',
-    marginBottom: 20,
-  },
-  otpInput: {
-    width: 120,
-    height: 56,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: 12,
-    fontSize: 24,
-    fontWeight: '700',
-    fontFamily: 'Poppins_700Bold',
-    textAlign: 'center',
-    letterSpacing: 8,
-    marginBottom: 10,
-  },
-  errorText: {
-    color: theme.colors.danger,
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    marginBottom: 10,
-  },
-  otpActionRow: {
+  avatarText: { fontSize: 24, fontFamily: 'Poppins_700Bold', color: '#4B5563' },
+  customerInfo: { flex: 1 },
+  customerName: { fontSize: 18, fontFamily: 'Poppins_700Bold', color: '#111827', marginBottom: 2 },
+  starsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ratingText: { fontSize: 13, fontFamily: 'Poppins_500Medium', color: '#4B5563' },
+  contactActions: { flexDirection: 'row', gap: 10 },
+  contactBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  
+  // Trip Details Card
+  tripDetailsCard: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 10,
-    width: '100%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 24, padding: 20,
+    borderWidth: 1, borderColor: '#F3F4F6',
+    marginBottom: 24,
   },
-  cancelOtpBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  cancelOtpText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.text,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  verifyOtpBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.success,
-  },
-  verifyOtpText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFF',
-    fontFamily: 'Poppins_600SemiBold',
-  },
+  timelineContainer: { alignItems: 'center', width: 24, marginRight: 12, paddingVertical: 4 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#D1FAE5' },
+  timelineLine: { flex: 1, width: 2, backgroundColor: '#E5E7EB', marginVertical: 4 },
+  timelineSquare: { width: 12, height: 12, borderRadius: 3, borderWidth: 2, borderColor: '#FEE2E2' },
+  locationsContainer: { flex: 1, paddingVertical: 2 },
+  locationBlock: { flex: 1, justifyContent: 'center' },
+  locationLabel: { fontSize: 11, fontFamily: 'Poppins_600SemiBold', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 },
+  locationText: { fontSize: 15, fontFamily: 'Poppins_600SemiBold', color: '#111827', marginTop: 2 },
+  locationDivider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 },
+  
+  tripMetaCol: { alignItems: 'flex-end', justifyContent: 'space-between', paddingLeft: 16, borderLeftWidth: 1, borderLeftColor: '#E5E7EB' },
+  fareBadge: { flexDirection: 'row', alignItems: 'flex-start' },
+  fareCurrency: { fontSize: 14, fontFamily: 'Poppins_600SemiBold', color: '#10B981', marginTop: 2 },
+  fareAmount: { fontSize: 24, fontFamily: 'Poppins_700Bold', color: '#111827' },
+  infoChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB' },
+  infoChipText: { fontSize: 12, fontFamily: 'Poppins_500Medium', color: '#4B5563' },
+  
+  // Actions
+  actionContainer: { flexDirection: 'row', gap: 12 },
+  primaryActionWrap: { flex: 1, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 },
+  primaryActionBtn: { height: 64, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  primaryActionText: { fontSize: 18, fontFamily: 'Poppins_700Bold', color: '#FFFFFF' },
+  cancelBtn: { width: 64, height: 64, borderRadius: 20, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center' },
+
+  // No Ride State
+  noRideContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  noRideTitle: { fontSize: 24, fontFamily: 'Poppins_700Bold', color: '#4B5563' },
+  noRideDesc: { fontSize: 15, fontFamily: 'Poppins_400Regular', color: '#9CA3AF', textAlign: 'center', paddingHorizontal: 40 },
+  goHomeBtn: { backgroundColor: '#111827', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 16, marginTop: 12 },
+  goHomeBtnText: { fontSize: 16, fontFamily: 'Poppins_700Bold', color: '#FFFFFF' },
+
+  // Modals
+  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
+  otpModalContainer: { width: '85%', backgroundColor: '#FFFFFF', borderRadius: 32, padding: 32, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 15 },
+  otpModalTitle: { fontSize: 24, fontFamily: 'Poppins_700Bold', color: '#111827', marginBottom: 8 },
+  otpModalDesc: { fontSize: 15, fontFamily: 'Poppins_400Regular', color: '#6B7280', textAlign: 'center', marginBottom: 24 },
+  otpInput: { width: '100%', height: 64, backgroundColor: '#F3F4F6', borderRadius: 16, fontSize: 32, fontFamily: 'Poppins_700Bold', textAlign: 'center', letterSpacing: 12, marginBottom: 12, color: '#111827' },
+  errorText: { color: '#EF4444', fontSize: 13, fontFamily: 'Poppins_500Medium', marginBottom: 16 },
+  otpActionRow: { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
+  cancelOtpBtn: { flex: 1, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' },
+  cancelOtpText: { fontSize: 16, fontFamily: 'Poppins_600SemiBold', color: '#4B5563' },
+  verifyOtpBtn: { flex: 1, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#10B981' },
+  verifyOtpText: { fontSize: 16, fontFamily: 'Poppins_600SemiBold', color: '#FFFFFF' },
 });
