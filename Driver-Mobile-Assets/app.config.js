@@ -37,7 +37,7 @@ module.exports = () => {
       ...expo.extra,
       eas: {
         ...expo.extra?.eas,
-        projectId: "c132d689-13b7-4f02-a07f-b4dae687eae0",
+        projectId: "04044752-9181-4d0d-9b58-7e3e3105b8b1",
       },
     },
     android: {

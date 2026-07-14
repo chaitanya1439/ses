@@ -16,7 +16,7 @@ const RESEND_SECONDS = 30;
 export default function OTPScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { verifyOTP, requestOTP } = useAuth();
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [resendTimer, setResendTimer] = useState(RESEND_SECONDS);
   const [loading, setLoading] = useState(false);
@@ -74,17 +74,31 @@ export default function OTPScreen() {
     }
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await login(phone || '+91 98765 43210');
-    router.replace('/permissions');
-    setLoading(false);
+    try {
+      await verifyOTP(code, phone || '+91 98765 43210');
+      router.replace('/permissions');
+    } catch (e) {
+      shakeError();
+      setError('Invalid OTP code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (resendTimer > 0) return;
     setOtp(Array(OTP_LENGTH).fill(''));
     setResendTimer(RESEND_SECONDS);
     inputRefs.current[0]?.focus();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    try {
+      if (phone) {
+        await requestOTP(phone);
+      }
+    } catch (e) {
+      setError('Failed to resend OTP.');
+    }
   };
 
   return (

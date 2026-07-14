@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 export interface Driver {
   id: string;
@@ -39,6 +40,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (phone: string) => Promise<void>;
+  requestOTP: (phone: string) => Promise<void>;
+  verifyOTP: (code: string, phone: string) => Promise<void>;
   register: (data: Omit<Driver, 'id' | 'rating' | 'totalRides' | 'hoursOnline' | 'earningsThisMonth' | 'token' | 'isVerified' | 'verifiedDocuments'>) => Promise<void>;
   logout: () => Promise<void>;
   updateDriver: (updates: Partial<Driver>) => void;
@@ -65,6 +68,7 @@ const DEFAULT_DRIVER: Driver = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmResult, setConfirmResult] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('driver_session').then((data) => {
@@ -85,6 +89,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const d = { ...DEFAULT_DRIVER, phone };
     await AsyncStorage.setItem('driver_session', JSON.stringify(d));
     setDriver(d);
+  };
+
+  const requestOTP = async (phone: string) => {
+    try {
+      const confirmation = await auth().signInWithPhoneNumber(phone);
+      setConfirmResult(confirmation);
+    } catch (e) {
+      console.error('Firebase requestOTP error:', e);
+      throw e;
+    }
+  };
+
+  const verifyOTP = async (code: string, phone: string) => {
+    try {
+      if (confirmResult) {
+        await confirmResult.confirm(code);
+      }
+      const d = { ...DEFAULT_DRIVER, phone };
+      await AsyncStorage.setItem('driver_session', JSON.stringify(d));
+      setDriver(d);
+    } catch (e) {
+      console.error('Firebase verifyOTP error:', e);
+      throw e;
+    }
   };
 
   const register = async (data: Omit<Driver, 'id' | 'rating' | 'totalRides' | 'hoursOnline' | 'earningsThisMonth' | 'token' | 'isVerified' | 'verifiedDocuments'>) => {
@@ -120,6 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!driver,
     isLoading,
     login,
+    requestOTP,
+    verifyOTP,
     register,
     logout,
     updateDriver,

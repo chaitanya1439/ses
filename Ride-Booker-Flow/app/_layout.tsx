@@ -48,7 +48,7 @@ function SocketWrapper({ children }: { children: React.ReactNode }) {
   return (
     <SocketProvider 
       role="rider" 
-      userId={user.phone} 
+      userId={user.id} 
       token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InJpZGVyLTAwMSIsInJvbGUiOiJyaWRlciJ9.pz5qZubhjBOCuM-BwbaImq21Hfm-4Iu_W4NF3JL2_ig"
     >
       {children}

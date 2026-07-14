@@ -9,10 +9,13 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { theme } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { requestOTP } = useAuth();
   const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
   const borderAnim = useRef(new Animated.Value(0)).current;
 
   const handleFocus = () => {
@@ -28,10 +31,18 @@ export default function LoginScreen() {
     outputRange: [theme.colors.border, theme.colors.primary],
   });
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     if (phone.length < 10) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: '/otp', params: { phone: `+91 ${phone}` } });
+    setLoading(true);
+    try {
+      await requestOTP(`+91 ${phone}`);
+      router.push({ pathname: '/otp', params: { phone: `+91 ${phone}` } });
+    } catch (e) {
+      alert("Failed to send OTP. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -88,13 +99,13 @@ export default function LoginScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.sendBtn,
-              { opacity: phone.length < 10 ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+              { opacity: phone.length < 10 || loading ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
             ]}
             onPress={handleSendOTP}
-            disabled={phone.length < 10}
+            disabled={phone.length < 10 || loading}
           >
-            <Text style={styles.sendBtnText}>Send OTP</Text>
-            <Ionicons name="arrow-forward" size={20} color={theme.colors.dark} />
+            <Text style={styles.sendBtnText}>{loading ? 'Sending...' : 'Send OTP'}</Text>
+            {!loading && <Ionicons name="arrow-forward" size={20} color={theme.colors.dark} />}
           </Pressable>
 
           <View style={styles.dividerRow}>
