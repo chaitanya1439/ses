@@ -61,8 +61,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
         return;
       }
 
-      // Connect without token in URL — auth is handled via the post-connect 'auth' message
-      const ws = new WebSocket(PUBLIC_WEBSOCKET_URL);
+      // Pass token in URL for HTTP Upgrade authentication
+      const urlWithAuth = token ? `${PUBLIC_WEBSOCKET_URL}?token=${encodeURIComponent(token)}` : PUBLIC_WEBSOCKET_URL;
+      
+      console.log(`[Socket] ═══ RIDER AUTH DEBUG ═══`);
+      console.log(`[Socket] PUBLIC_WEBSOCKET_URL: ${PUBLIC_WEBSOCKET_URL}`);
+      console.log(`[Socket] Token present: ${!!token}`);
+      console.log(`[Socket] Token value: ${token ? token.substring(0, 40) + '...' : 'NONE'}`);
+      console.log(`[Socket] Role: ${role}, UserId: ${userId}`);
+      console.log(`[Socket] Full connect URL: ${urlWithAuth.substring(0, 80)}...`);
+      
+      const ws = new WebSocket(urlWithAuth);
       socketRef.current = ws;
 
       ws.onopen = () => {
