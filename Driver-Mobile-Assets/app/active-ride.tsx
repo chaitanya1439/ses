@@ -102,7 +102,7 @@ export default function ActiveRideScreen() {
     if (otpInput === expectedOtp) {
       setShowOtpModal(false);
       advanceRideStep();
-      sendThrottledMessage('trip_status_update', { riderId, status: 'arrived' }, 0);
+      sendThrottledMessage('trip_status_update', { riderId, status: 'started' }, 0);
     } else {
       setOtpError('Invalid OTP. Please ask the rider.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -260,14 +260,13 @@ export default function ActiveRideScreen() {
           </KeyboardAvoidingView>
         </View>
       )}
-      {chatVisible && (
-        <ChatModal
-          visible={chatVisible}
-          onClose={() => setChatVisible(false)}
-          targetId={activeRide?.customer?.id || 'rider'}
-          driverName={activeRide?.customer?.name || 'Rider'}
-        />
-      )}
+      
+      <ChatModal
+        visible={chatVisible}
+        onClose={() => setChatVisible(false)}
+        targetId={activeRide?.customer?.id || 'rider'}
+        driverName={activeRide?.customer?.name || 'Rider'}
+      />
     </View>
   );
 }

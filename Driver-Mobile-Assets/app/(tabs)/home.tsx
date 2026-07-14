@@ -296,7 +296,7 @@ export default function HomeScreen() {
             >
               <MaterialCommunityIcons name="crown" size={28} color={theme.colors.purple} />
               <Text style={[styles.quickActionValue, { color: theme.colors.purple }]}>Active</Text>
-              <Text style={styles.quickActionLabel}>Subscription</Text>
+              <Text style={styles.quickActionLabel}>Recharge</Text>
             </Pressable>
 
             <Pressable

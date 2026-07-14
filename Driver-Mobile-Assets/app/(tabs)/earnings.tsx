@@ -117,21 +117,26 @@ export default function EarningsScreen() {
           </View>
         </LinearGradient>
 
-        <View style={styles.commissionBanner}>
-          <View style={styles.coinBox}>
-            <MaterialCommunityIcons name="medal" size={24} color={theme.colors.primary} />
+        <Pressable 
+          style={styles.planBanner}
+          onPress={() => router.push('/subscription')}
+        >
+          <View style={styles.planBannerLeft}>
+            <Text style={styles.planBannerTitle}>Choose your{'\n'}earning plan</Text>
+            <View style={styles.planBannerBtn}>
+              <Text style={styles.planBannerBtnText}>View All Plans</Text>
+              <Ionicons name="arrow-forward" size={14} color="#FFF" />
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.commissionTitle}>₹196.91 Commission Saved</Text>
-            <Text style={styles.commissionSub}>Till now with zero commission plan</Text>
+          <View style={styles.myPlanBadge}>
+            <View style={styles.myPlanTop}>
+              <Text style={styles.myPlanSmallRupee}>₹</Text>
+              <Text style={styles.myPlanText}>MY</Text>
+              <Text style={styles.myPlanSmallRupee}>₹</Text>
+            </View>
+            <Text style={styles.planText}>PLAN</Text>
           </View>
-          <Pressable
-            style={styles.viewPlanBtn}
-            onPress={() => router.push('/subscription')}
-          >
-            <Text style={styles.viewPlanText}>View</Text>
-          </Pressable>
-        </View>
+        </Pressable>
 
         <View style={styles.chartSection}>
           <Text style={styles.sectionTitle}>Weekly Overview</Text>
@@ -258,33 +263,34 @@ const styles = StyleSheet.create({
     fontSize: 13, color: theme.colors.dark + 'CC',
     fontFamily: 'Poppins_400Regular',
   },
-  commissionBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: theme.colors.surface, borderRadius: 16, padding: 16,
-    borderWidth: 1.5, borderColor: theme.colors.primary + '40',
+  planBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#000', borderRadius: 16, padding: 20,
     ...theme.shadows.sm,
   },
-  coinBox: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: theme.colors.primary + '18',
-    justifyContent: 'center', alignItems: 'center',
+  planBannerLeft: { gap: 12 },
+  planBannerTitle: {
+    fontSize: 18, fontWeight: '700', color: '#FFF',
+    fontFamily: 'Poppins_700Bold', lineHeight: 24,
   },
-  commissionTitle: {
-    fontSize: 14, fontWeight: '700', color: theme.colors.text,
-    fontFamily: 'Poppins_700Bold',
+  planBannerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderColor: '#FFF', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6, alignSelf: 'flex-start',
   },
-  commissionSub: {
-    fontSize: 12, color: theme.colors.textLight,
-    fontFamily: 'Poppins_400Regular', marginTop: 2,
+  planBannerBtnText: {
+    fontSize: 12, fontWeight: '600', color: '#FFF',
+    fontFamily: 'Poppins_600SemiBold',
   },
-  viewPlanBtn: {
-    backgroundColor: theme.colors.primary, borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 6,
+  myPlanBadge: {
+    backgroundColor: '#003399', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 3, borderColor: '#0044CC',
   },
-  viewPlanText: {
-    fontSize: 12, fontWeight: '700', color: theme.colors.dark,
-    fontFamily: 'Poppins_700Bold',
-  },
+  myPlanTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  myPlanSmallRupee: { fontSize: 10, color: '#FFD700', fontWeight: 'bold' },
+  myPlanText: { fontSize: 16, color: '#77AAFF', fontWeight: '900', fontFamily: 'Poppins_700Bold' },
+  planText: { fontSize: 22, color: '#FFD700', fontWeight: '900', fontFamily: 'Poppins_700Bold' },
   chartSection: { gap: 12 },
   sectionTitle: {
     fontSize: 16, fontWeight: '700', color: theme.colors.text,

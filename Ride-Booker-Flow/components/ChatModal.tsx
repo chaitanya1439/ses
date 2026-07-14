@@ -31,8 +31,6 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
   const quickReplies = ['On my way!', 'Wait 2 min', 'I\'m here', 'Where are you?'];
 
   useEffect(() => {
-    if (!visible) return;
-    
     const unsubscribe = subscribe('CHAT_MESSAGE', (payload) => {
       if (payload.from === targetId || payload.fromId === targetId) {
         setMessages(prev => [...prev, {
@@ -46,7 +44,7 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
     });
 
     return () => unsubscribe();
-  }, [visible, subscribe, targetId]);
+  }, [subscribe, targetId]);
 
   const handleSend = (text?: string) => {
     const msgText = (text || inputText).trim();

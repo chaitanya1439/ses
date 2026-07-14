@@ -72,6 +72,7 @@ function ClassicTabLayout() {
         name="orders"
         options={{
           title: "Orders",
+          href: "/orders",
           tabBarIcon: ({ focused }) => (
             <View style={[styles.ordersPill, focused && styles.ordersPillActive]}>
               <Ionicons

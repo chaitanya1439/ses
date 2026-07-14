@@ -23,6 +23,7 @@ import { mockDriver, vehicleOptions } from "@/constants/mockData";
 import { fetchDirectionsPolyline } from "@/lib/googleMaps";
 import { customMapStyle } from "@/constants/mapStyle";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { BikeIcon, AutoIcon } from "@/components/VehicleIcons";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -440,8 +441,13 @@ export default function BookingConfirmedScreen() {
     const unsubscribeStatus = subscribe('trip_status_changed', (payload) => {
       console.log('Driver changed trip status:', payload);
       
-      if (payload.status === 'arrived') {
+      if (payload.status === 'arrived' || payload.status === 'started') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        if (selectedVehicle !== 'parcel') {
+          setIsOtpVerified(true);
+        }
+        
         setCurrentStep(1);
         RNAnimated.timing(progressAnim, {
           toValue: 0.5,
@@ -488,6 +494,12 @@ export default function BookingConfirmedScreen() {
   };
 
   const renderVehicleIcon = (size = 20, color = Colors.white) => {
+    if (vehicle?.id === 'auto') {
+      return <AutoIcon width={size} height={size} />;
+    }
+    if (vehicle?.id === 'bike' || vehicle?.id === 'bike-boost' || vehicle?.id === 'bike-metro') {
+      return <BikeIcon width={size} height={size} />;
+    }
     if ((vehicle as any)?.useCustomImage) {
       return (
         <Image
@@ -572,9 +584,7 @@ export default function BookingConfirmedScreen() {
             {/* Live driver marker with rotation */}
             {isConfirmed && (
               <Marker coordinate={driverCoord} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
-                <View style={styles.uberDriverMarker}>
-                  {renderVehicleIcon(24, Colors.white)}
-                </View>
+                {renderVehicleIcon(40, Colors.dark)}
               </Marker>
             )}
 
@@ -704,7 +714,7 @@ export default function BookingConfirmedScreen() {
                 </View>
               </View>
 
-              {!isOtpVerified && (
+              {!isOtpVerified && selectedVehicle === 'parcel' && (
                 <Pressable 
                   style={[styles.cancelRequestBtn, { backgroundColor: Colors.primary, marginBottom: 16 }]} 
                   onPress={() => setIsOtpVerified(true)}
@@ -754,15 +764,12 @@ export default function BookingConfirmedScreen() {
         </BottomSheetScrollView>
       </BottomSheet>
 
-
-      {chatVisible && (
-        <ChatModal 
-          visible={chatVisible} 
-          onClose={() => setChatVisible(false)} 
-          targetId={driverDetails?.name || 'driver'} 
-          driverName={driverDetails?.name} 
-        />
-      )}
+      <ChatModal 
+        visible={chatVisible} 
+        onClose={() => setChatVisible(false)} 
+        targetId={driverDetails?.name || 'driver'} 
+        driverName={driverDetails?.name} 
+      />
 
       {shareVisible && (
         <ShareTripModal 

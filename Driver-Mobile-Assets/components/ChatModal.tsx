@@ -28,8 +28,6 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    if (!visible) return;
-    
     const unsubscribe = subscribe('CHAT_MESSAGE', (payload: any) => {
       if (payload.from === targetId || payload.fromId === targetId) {
         setMessages(prev => [...prev, {
@@ -43,7 +41,7 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
     });
 
     return () => unsubscribe();
-  }, [visible, subscribe, targetId]);
+  }, [subscribe, targetId]);
 
   const handleSend = () => {
     if (!inputText.trim()) return;
