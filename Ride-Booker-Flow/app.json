@@ -78,10 +78,12 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "1.8.10"
+            "kotlinVersion": "2.1.20"
           }
         }
-      ]
+      ],
+      "expo-image",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

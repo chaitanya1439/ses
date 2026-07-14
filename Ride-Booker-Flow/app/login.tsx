@@ -17,6 +17,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withSequence,
 } from "react-native-reanimated";
 import { Colors } from "@/constants/colors";
 
@@ -35,9 +36,10 @@ export default function LoginScreen() {
   const handleSendOtp = async () => {
     if (!isValid) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    buttonScale.value = withSpring(0.95, {}, () => {
-      buttonScale.value = withSpring(1);
-    });
+    buttonScale.value = withSequence(
+      withSpring(0.95),
+      withSpring(1)
+    );
     router.push({ pathname: "/otp", params: { phone } });
   };
 

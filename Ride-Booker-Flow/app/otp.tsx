@@ -91,9 +91,10 @@ export default function OtpScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    buttonScale.value = withSpring(0.95, {}, () => {
-      buttonScale.value = withSpring(1);
-    });
+    buttonScale.value = withSequence(
+      withSpring(0.95),
+      withSpring(1)
+    );
     await login(`+91 ${phone}`);
     router.replace("/(tabs)/home");
   };
