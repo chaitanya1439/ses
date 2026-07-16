@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/constants/colors';
 
@@ -64,6 +62,7 @@ const DEFAULT_RATES: Record<VehicleCategory, RateConfig> = {
 
 export default function RateCardScreen() {
   const insets = useSafeAreaInsets();
+  const { isNewDriver } = useLocalSearchParams();
   const [activeCategory, setActiveCategory] = useState<VehicleCategory>('Bike');
   const [rates, setRates] = useState<Record<VehicleCategory, RateConfig> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -224,8 +223,20 @@ export default function RateCardScreen() {
             </View>
           </View>
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: 100 }} />
         </ScrollView>
+      )}
+
+      {isNewDriver && (
+        <View style={[styles.bottomAction, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <Pressable 
+            style={styles.continueBtn} 
+            onPress={() => router.replace({ pathname: '/subscription-plans', params: { isNewDriver: 'true' } })}
+          >
+            <Text style={styles.continueBtnText}>Proceed to Recharge Plans</Text>
+            <Ionicons name="arrow-forward" size={20} color={theme.colors.dark} />
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -346,5 +357,19 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1, paddingRight: 10,
+  },
+  bottomAction: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#FFF', paddingHorizontal: 20, paddingTop: 16,
+    borderTopWidth: 1, borderTopColor: '#EEE',
+    ...theme.shadows.card,
+  },
+  continueBtn: {
+    backgroundColor: theme.colors.primary, borderRadius: 14, height: 58,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+  },
+  continueBtnText: {
+    fontSize: 16, fontWeight: '700', color: theme.colors.dark,
+    fontFamily: 'Poppins_700Bold',
   },
 });

@@ -82,26 +82,23 @@ export function RideRequestPopup() {
   // Fetch road-following polyline for the map
   useEffect(() => {
     if (!incomingRide || !showRidePopup) return;
+    const pickupCoord = { latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng };
+    const dropCoord = { latitude: incomingRide.drop.lat, longitude: incomingRide.drop.lng };
     (async () => {
-      const coords = await fetchDirectionsPolyline(
-        { latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng },
-        { latitude: incomingRide.drop.lat, longitude: incomingRide.drop.lng }
-      );
+      const coords = await fetchDirectionsPolyline(pickupCoord, dropCoord);
       if (coords && coords.length > 1) {
-        setRouteCoords(coords);
+        // Pad with exact marker coords so polyline visually connects to pins
+        setRouteCoords([pickupCoord, ...coords, dropCoord]);
         // Fit map to show entire route
         setTimeout(() => {
-          mapRef.current?.fitToCoordinates(coords, {
+          mapRef.current?.fitToCoordinates([pickupCoord, ...coords, dropCoord], {
             edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
             animated: true,
           });
         }, 300);
       } else {
         // Fallback: straight line
-        setRouteCoords([
-          { latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng },
-          { latitude: incomingRide.drop.lat, longitude: incomingRide.drop.lng },
-        ]);
+        setRouteCoords([pickupCoord, dropCoord]);
       }
     })();
   }, [incomingRide, showRidePopup]);

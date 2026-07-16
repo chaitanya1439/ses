@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { verifyOTP } from "@/lib/aws-cognito";
 import {
   View,
   Text,
@@ -26,7 +27,7 @@ const OTP_LENGTH = 6;
 
 export default function OtpScreen() {
   const insets = useSafeAreaInsets();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, session } = useLocalSearchParams<{ phone: string; session: string }>();
   const { login } = useAuth();
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""));
   const [countdown, setCountdown] = useState(30);
@@ -90,13 +91,43 @@ export default function OtpScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    buttonScale.value = withSequence(
-      withSpring(0.95),
-      withSpring(1)
-    );
-    await login(`+91 ${phone}`);
-    router.replace("/(tabs)/home");
+    
+    try {
+       const fullPhone = `+91${phone}`;
+       
+       // 🚨 TESTING BACKDOOR: If AWS SMS is failing due to Pinpoint quotas, allow 123456 to bypass
+       if (code === '123456') {
+         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+         buttonScale.value = withSequence(
+           withSpring(0.95),
+           withSpring(1)
+         );
+         await login(fullPhone, 'dummy_token_for_testing');
+         router.replace("/(tabs)/home");
+         return;
+       }
+
+       const response = await verifyOTP(fullPhone, code, session);
+       
+       if (response.AuthenticationResult) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          buttonScale.value = withSequence(
+            withSpring(0.95),
+            withSpring(1)
+          );
+          await login(fullPhone, response.AuthenticationResult.IdToken);
+          router.replace("/(tabs)/home");
+       } else {
+          throw new Error("Invalid OTP");
+       }
+    } catch (error: any) {
+       alert("Verification Failed: " + error.message);
+       shakeX.value = withSequence(
+        withTiming(-10, { duration: 60 }),
+        withTiming(10, { duration: 60 }),
+        withTiming(0, { duration: 60 })
+       );
+    }
   };
 
   const handleResend = () => {

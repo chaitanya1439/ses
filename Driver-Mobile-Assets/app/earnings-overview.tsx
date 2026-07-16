@@ -109,7 +109,13 @@ export default function EarningsOverviewScreen() {
           <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
         </Pressable>
 
-        <Pressable style={styles.menuCard}>
+        <Pressable 
+          style={styles.menuCard}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/rate-card' as any);
+          }}
+        >
           <View style={styles.menuIcon}>
             <Text style={styles.rupeeIcon}>₹</Text>
           </View>
@@ -120,7 +126,13 @@ export default function EarningsOverviewScreen() {
         </Pressable>
 
         {/* ─── EARNING PLAN PROMO ─── */}
-        <Pressable style={styles.promoCard}>
+        <Pressable 
+          style={styles.promoCard}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/subscription-plans' as any);
+          }}
+        >
           <View style={{ flex: 1 }}>
             <Text style={styles.promoTitle}>Choose your earning plan</Text>
             <View style={styles.promoBtn}>

@@ -270,7 +270,6 @@ export default function ConfirmPickupScreen() {
             }}
             showsUserLocation
             showsMyLocationButton={false}
-            showsPointsOfInterest={false}
             customMapStyle={customMapStyle}
             showsCompass={false}
             onRegionChange={() => setIsMapMoving(true)}

@@ -12,9 +12,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#FFB800"
     },
-    "updates": {
-      "url": "https://u.expo.dev/a017223e-ac28-4be6-b023-0cd9f942b379"
-    },
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -30,6 +27,10 @@
     "android": {
       "package": "com.ridego",
       "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -78,7 +79,8 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "2.1.20"
+            "kotlinVersion": "2.1.20",
+            "minSdkVersion": 23
           }
         }
       ],
@@ -94,8 +96,11 @@
         "origin": "https://ridego.app/"
       },
       "eas": {
-        "projectId": "a017223e-ac28-4be6-b023-0cd9f942b379"
+        "projectId": "ffd103ad-8ac4-407a-a511-818380f6a69d"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ffd103ad-8ac4-407a-a511-818380f6a69d"
     }
   }
 }

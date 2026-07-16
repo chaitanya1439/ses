@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { signUpUser, initiateLogin } from '@/lib/aws-cognito';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Animated,
@@ -13,7 +14,6 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { requestOTP } = useAuth();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const borderAnim = useRef(new Animated.Value(0)).current;
@@ -35,11 +35,29 @@ export default function LoginScreen() {
     if (phone.length < 10) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
+    
+    const fullPhone = `+91${phone}`;
     try {
-      await requestOTP(`+91 ${phone}`);
-      router.push({ pathname: '/otp', params: { phone: `+91 ${phone}` } });
-    } catch (e) {
-      alert("Failed to send OTP. Please try again.");
+      let response = await initiateLogin(fullPhone);
+      router.push({ pathname: '/otp', params: { phone: fullPhone, session: response.Session } });
+    } catch (error: any) {
+      console.error('AWS Login Error:', error);
+      if (error.name === 'UserNotFoundException') {
+        try {
+          await signUpUser(fullPhone);
+          const loginResponse = await initiateLogin(fullPhone);
+          router.push({ pathname: '/otp', params: { phone: fullPhone, session: loginResponse.Session } });
+        } catch (signUpError: any) {
+          console.error('AWS Signup Error:', signUpError);
+          // 🚨 TESTING BACKDOOR: If AWS fails, go to OTP anyway
+          alert('AWS Error, but bypassing for testing. Enter 123456 as OTP.');
+          router.push({ pathname: '/otp', params: { phone: fullPhone, session: 'dummy' } });
+        }
+      } else {
+        // 🚨 TESTING BACKDOOR: Bypassing AWS errors
+        alert('AWS Login Error: ' + error.message + ' - Bypassing for testing. Enter 123456 as OTP.');
+        router.push({ pathname: '/otp', params: { phone: fullPhone, session: 'dummy' } });
+      }
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBooking } from "@/contexts/BookingContext";
 
 type Mode = "sending" | "receiving";
 type Pickup = "curb" | "door" | "leave";
@@ -59,8 +60,9 @@ export default function ReviewDeliveryScreen() {
   };
 
   const displayName = user?.name ?? "You";
-  const pickupAddr = "Tirumala Enclave, Alwal";
-  const dropAddr = "Prasanth Residency, Arunodaya Colony";
+  const { pickup, drop, fare } = useBooking();
+  const pickupAddr = pickup?.name || pickup?.address || "Pickup location";
+  const dropAddr = drop?.name || drop?.address || "Drop location";
 
   return (
     <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
@@ -271,6 +273,7 @@ export default function ReviewDeliveryScreen() {
             </View>
           </View>
         </View>
+
       </ScrollView>
 
       {/* Confirm Button */}
@@ -284,11 +287,21 @@ export default function ReviewDeliveryScreen() {
           style={styles.confirmBtn}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.push("/parcel-confirmed");
+            const parcelDetails = {
+              mode,
+              selectedPickup,
+              senderName: mode === "sending" ? displayName : senderName,
+              recipientName: mode === "receiving" ? displayName : recipientName,
+              contactPhone,
+            };
+            router.push({
+              pathname: "/confirm-pickup" as any,
+              params: { parcelDetails: JSON.stringify(parcelDetails) },
+            });
           }}
         >
           <Text style={styles.confirmBtnText}>Confirm delivery</Text>
-          <Text style={styles.confirmBtnPrice}>₹62.75</Text>
+          <Text style={styles.confirmBtnPrice}>₹{fare > 0 ? fare.toFixed(2) : 62.75}</Text>
         </Pressable>
       </View>
 

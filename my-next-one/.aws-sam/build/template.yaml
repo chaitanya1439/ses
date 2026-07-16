@@ -1,0 +1,364 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RideGo Serverless Backend Architecture
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs24.x
+    Architectures:
+    - x86_64
+Resources:
+  UsersTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: userId
+        Type: String
+      TableName: ridego-users
+  RidesTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: rideId
+        Type: String
+      TableName: ridego-rides
+  DriverDocumentsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: driverId
+        Type: String
+      TableName: ridego-driver-documents
+  DriverDocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: ridego-driver-documents-${AWS::AccountId}-${AWS::Region}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  ProfilePhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: ridego-profile-photos-${AWS::AccountId}-${AWS::Region}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  ProfilePhotosCloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: OAI for RideGo Profile Photos
+  ProfilePhotosBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: ProfilePhotosBucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::${ProfilePhotosBucket}/*
+          Principal:
+            CanonicalUser:
+              Fn::GetAtt:
+              - ProfilePhotosCloudFrontOriginAccessIdentity
+              - S3CanonicalUserId
+  ProfilePhotosDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: ProfilePhotosS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            QueryString: false
+        Origins:
+        - Id: ProfilePhotosS3Origin
+          DomainName:
+            Fn::GetAtt:
+            - ProfilePhotosBucket
+            - RegionalDomainName
+          S3OriginConfig:
+            OriginAccessIdentity:
+              Fn::Sub: origin-access-identity/cloudfront/${ProfilePhotosCloudFrontOriginAccessIdentity}
+  RideGoIoTPolicy:
+    Type: AWS::IoT::Policy
+    Properties:
+      PolicyName: RideGoGPSPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - iot:Connect
+          - iot:Publish
+          - iot:Subscribe
+          - iot:Receive
+          Resource: '*'
+  DocumentVerificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: DocumentVerificationFunction
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          DOCUMENTS_BUCKET:
+            Ref: DriverDocumentsBucket
+      Events:
+        VerifyApi:
+          Type: Api
+          Properties:
+            Path: /verify
+            Method: post
+      Policies:
+      - S3CrudPolicy:
+          BucketName:
+            Ref: DriverDocumentsBucket
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - textract:StartDocumentAnalysis
+          - textract:GetDocumentAnalysis
+          Resource: '*'
+    Metadata:
+      SamResourceId: DocumentVerificationFunction
+  DocumentVerificationStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Definition:
+        StartAt: ExtractDocumentText
+        States:
+          ExtractDocumentText:
+            Type: Task
+            Resource:
+              Fn::GetAtt:
+              - DocumentVerificationFunction
+              - Arn
+            End: true
+      Policies:
+      - LambdaInvokePolicy:
+          FunctionName:
+            Ref: DocumentVerificationFunction
+  RideGoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ridego-auth-pool
+      UsernameAttributes:
+      - phone_number
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+      LambdaConfig:
+        PreSignUp:
+          Fn::GetAtt:
+          - PreSignUpFunction
+          - Arn
+        DefineAuthChallenge:
+          Fn::GetAtt:
+          - DefineAuthChallengeFunction
+          - Arn
+        CreateAuthChallenge:
+          Fn::GetAtt:
+          - CreateAuthChallengeFunction
+          - Arn
+        VerifyAuthChallengeResponse:
+          Fn::GetAtt:
+          - VerifyAuthChallengeFunction
+          - Arn
+  RideGoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: ridego-mobile-client
+      UserPoolId:
+        Ref: RideGoUserPool
+      ExplicitAuthFlows:
+      - CUSTOM_AUTH_FLOW_ONLY
+      PreventUserExistenceErrors: ENABLED
+  RideGoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: ridego_identity_pool
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+      - ClientId:
+          Ref: RideGoUserPoolClient
+        ProviderName:
+          Fn::GetAtt:
+          - RideGoUserPool
+          - ProviderName
+  CognitoAuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Federated: cognito-identity.amazonaws.com
+          Action: sts:AssumeRoleWithWebIdentity
+          Condition:
+            StringEquals:
+              cognito-identity.amazonaws.com:aud:
+                Ref: RideGoIdentityPool
+            ForAnyValue:StringLike:
+              cognito-identity.amazonaws.com:amr: authenticated
+      Policies:
+      - PolicyName: CognitoAuthorizedPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - mobileanalytics:PutEvents
+            - cognito-sync:*
+            - cognito-identity:*
+            Resource: '*'
+      - PolicyName: IoTAuthPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - iot:Connect
+            - iot:Publish
+            - iot:Subscribe
+            - iot:Receive
+            Resource: '*'
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId:
+        Ref: RideGoIdentityPool
+      Roles:
+        authenticated:
+          Fn::GetAtt:
+          - CognitoAuthRole
+          - Arn
+  PreSignUpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: PreSignUpFunction
+      Handler: auth.preSignUp
+      Runtime: nodejs20.x
+    Metadata:
+      SamResourceId: PreSignUpFunction
+  DefineAuthChallengeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: DefineAuthChallengeFunction
+      Handler: auth.defineAuthChallenge
+      Runtime: nodejs20.x
+    Metadata:
+      SamResourceId: DefineAuthChallengeFunction
+  CreateAuthChallengeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CreateAuthChallengeFunction
+      Handler: auth.createAuthChallenge
+      Runtime: nodejs20.x
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action: sns:Publish
+          Resource: '*'
+    Metadata:
+      SamResourceId: CreateAuthChallengeFunction
+  VerifyAuthChallengeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: VerifyAuthChallengeFunction
+      Handler: auth.verifyAuthChallenge
+      Runtime: nodejs20.x
+    Metadata:
+      SamResourceId: VerifyAuthChallengeFunction
+  PreSignUpInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - PreSignUpFunction
+        - Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - RideGoUserPool
+        - Arn
+  DefineAuthChallengeInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - DefineAuthChallengeFunction
+        - Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - RideGoUserPool
+        - Arn
+  CreateAuthChallengeInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - CreateAuthChallengeFunction
+        - Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - RideGoUserPool
+        - Arn
+  VerifyAuthChallengeInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - VerifyAuthChallengeFunction
+        - Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - RideGoUserPool
+        - Arn
+Outputs:
+  UsersTableName:
+    Description: DynamoDB Users Table
+    Value:
+      Ref: UsersTable
+  RidesTableName:
+    Description: DynamoDB Rides Table
+    Value:
+      Ref: RidesTable
+  ProfilePhotosCloudFrontURL:
+    Description: CloudFront URL for Profile Photos
+    Value:
+      Fn::GetAtt:
+      - ProfilePhotosDistribution
+      - DomainName
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value:
+      Ref: RideGoUserPool
+  CognitoClientId:
+    Description: Cognito Client ID
+    Value:
+      Ref: RideGoUserPoolClient
+  CognitoIdentityPoolId:
+    Description: Cognito Identity Pool ID
+    Value:
+      Ref: RideGoIdentityPool

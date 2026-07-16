@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, Link } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,7 +53,7 @@ export default function EarningsScreen() {
           style={styles.subscriptionBtn}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push('/subscription');
+            router.push('/subscription' as any);
           }}
         >
           <MaterialCommunityIcons name="crown" size={16} color={theme.colors.primary} />
@@ -119,7 +119,10 @@ export default function EarningsScreen() {
 
         <Pressable 
           style={styles.planBanner}
-          onPress={() => router.push('/subscription')}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/subscription' as any);
+          }}
         >
           <View style={styles.planBannerLeft}>
             <Text style={styles.planBannerTitle}>Choose your{'\n'}earning plan</Text>

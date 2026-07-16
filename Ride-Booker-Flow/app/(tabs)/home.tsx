@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  View, Text, StyleSheet, ScrollView, Pressable, StatusBar, Platform, Animated, Easing, Dimensions
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, StatusBar, Platform, Animated, Easing, Dimensions, Image } from "react-native";
 import { router } from "expo-router";
 import MapView, { Marker, AnimatedRegion, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons, Feather, FontAwesome5 } from "@expo/vector-icons";
@@ -21,23 +19,16 @@ const { height } = Dimensions.get("window");
 // ─── Types ───────────────────────────────────────────────────────────
 interface RecentSearch { id: string; name: string; address: string; }
 interface ServiceItem {
-  id: string; label: string; icon: string;
-  iconSet: "MaterialCommunityIcons" | "Ionicons" | "Feather" | "FontAwesome5";
+  id: string; label: string; icon?: string;
+  iconSet?: "MaterialCommunityIcons" | "Ionicons" | "Feather" | "FontAwesome5";
+  customImage?: any;
   promo?: string; route: string;
 }
 
 const SERVICES_ROW_1: ServiceItem[] = [
-  { id: "auto", label: "Auto", icon: "rickshaw", iconSet: "MaterialCommunityIcons", route: "/book-ride" },
   { id: "bike", label: "Bike", icon: "motorbike", iconSet: "MaterialCommunityIcons", promo: "₹2", route: "/book-ride" },
-  { id: "trip", label: "Cab", icon: "car-side", iconSet: "FontAwesome5", promo: "25% off", route: "/book-ride" },
   { id: "parcel", label: "Parcel", icon: "cube", iconSet: "Ionicons", route: "/parcel-locations" },
-];
-
-const SERVICES_ROW_2: ServiceItem[] = [
-  { id: "rentals", label: "Rentals", icon: "car-clock", iconSet: "MaterialCommunityIcons", route: "/book-ride" },
-  { id: "reserve", label: "Reserve", icon: "calendar", iconSet: "Ionicons", route: "/book-ride" },
-  { id: "intercity", label: "Intercity", icon: "car-estate", iconSet: "MaterialCommunityIcons", route: "/book-ride" },
-  { id: "store", label: "Explore", icon: "compass", iconSet: "Ionicons", route: "/all-services" },
+  { id: "she-bike", label: "She Bike", customImage: require("@/assets/images/she-bike-icon.png"), route: "/book-ride" },
 ];
 
 type BottomTab = "home" | "services" | "activity" | "account";
@@ -55,6 +46,9 @@ function SkeletonBlock({ width, height, borderRadius = 8, style }: { width: numb
 }
 
 function ServiceIcon({ item, size = 28 }: { item: ServiceItem; size?: number; }) {
+  if (item.customImage) {
+    return <Image source={item.customImage} style={{ width: size, height: size, borderRadius: 8 }} resizeMode="contain" />;
+  }
   const color = Colors.dark;
   switch (item.iconSet) {
     case "MaterialCommunityIcons": return <MaterialCommunityIcons name={item.icon as any} size={size} color={color} />;
@@ -311,22 +305,11 @@ export default function HomeScreen() {
           </View>
           
           <View style={styles.servicesGrid}>
-            <View style={styles.servicesRow}>
+            <View style={[styles.servicesRow, { justifyContent: 'flex-start', gap: 24 }]}>
               {SERVICES_ROW_1.map((srv) => (
                 <Pressable key={srv.id} style={styles.serviceItem} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(srv.route as any); }}>
                   <View style={styles.serviceIconWrap}>
                     <ServiceIcon item={srv} />
-                    {srv.promo && <PromoBadge text={srv.promo} />}
-                  </View>
-                  <Text style={styles.serviceLabel}>{srv.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.servicesRow}>
-              {SERVICES_ROW_2.map((srv) => (
-                <Pressable key={srv.id} style={styles.serviceItem} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(srv.route as any); }}>
-                  <View style={styles.serviceIconWrap}>
-                    <ServiceIcon item={srv} size={24} />
                     {srv.promo && <PromoBadge text={srv.promo} />}
                   </View>
                   <Text style={styles.serviceLabel}>{srv.label}</Text>

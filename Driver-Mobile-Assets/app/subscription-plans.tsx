@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,6 +36,7 @@ const PLANS: Plan[] = [
 
 export default function SubscriptionPlansScreen() {
   const insets = useSafeAreaInsets();
+  const { isNewDriver } = useLocalSearchParams();
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
   const [selectedPlan, setSelectedPlan] = useState('1');
 
@@ -167,7 +168,7 @@ export default function SubscriptionPlansScreen() {
           ]}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.push('/subscription-confirm' as any);
+            router.push({ pathname: '/subscription-confirm', params: { isNewDriver } } as any);
           }}
         >
           <Text style={styles.subscribeBtnText}>Subscribe</Text>

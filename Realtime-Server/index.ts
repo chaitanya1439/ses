@@ -425,7 +425,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
           }
 
           // Vehicle Type matching: Only dispatch if driver's vehicleType matches requested vehicleType
-          if (ridePayload.vehicleType && driver.vehicleType && ridePayload.vehicleType !== driver.vehicleType) {
+          if (ridePayload.vehicleType && driver.vehicleType && ridePayload.vehicleType.toLowerCase() !== driver.vehicleType.toLowerCase()) {
             console.log(`[Dispatch] Skipped Driver ${driver.id} - vehicle type mismatch (${driver.vehicleType} != ${ridePayload.vehicleType})`);
             return;
           }

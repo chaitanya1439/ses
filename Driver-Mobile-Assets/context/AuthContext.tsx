@@ -39,7 +39,7 @@ interface AuthContextValue {
   driver: Driver | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (phone: string) => Promise<void>;
+  login: (phone: string, token?: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<void>;
   verifyOTP: (code: string, phone: string) => Promise<void>;
   register: (data: Omit<Driver, 'id' | 'rating' | 'totalRides' | 'hoursOnline' | 'earningsThisMonth' | 'token' | 'isVerified' | 'verifiedDocuments'>) => Promise<void>;
@@ -85,8 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const login = async (phone: string) => {
-    const d = { ...DEFAULT_DRIVER, phone };
+  const login = async (phone: string, token?: string) => {
+    const d = { ...DEFAULT_DRIVER, phone, token: token || DEFAULT_DRIVER.token };
     await AsyncStorage.setItem('driver_session', JSON.stringify(d));
     setDriver(d);
   };

@@ -147,8 +147,8 @@ export default function RideMapScreen() {
             customMapStyle={customMapStyle}
             showsCompass={false}
           >
-            {directions?.polyline && (
-              <Polyline coordinates={directions.polyline} strokeWidth={5} strokeColor="#4F46E5" />
+            {directions?.polyline && pickupCoords && destCoords && (
+              <Polyline coordinates={[pickupCoords, ...directions.polyline, destCoords]} strokeWidth={5} strokeColor="#4F46E5" />
             )}
             
             {pickupCoords && (

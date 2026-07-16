@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { ioTClient } from "@/lib/aws-iot";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   View,
   Text,
@@ -36,6 +38,8 @@ export default function ParcelConfirmedScreen() {
   const [deliveryRoute, setDeliveryRoute] = useState<{ latitude: number; longitude: number }[]>([]);
   const [vehiclePos, setVehiclePos] = useState(DRIVER_START);
   const [trailCoords, setTrailCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+
+  const { token, user } = useAuth();
 
   // Animation refs
   const pulseAnim = useRef(new RNAnimated.Value(1)).current;
@@ -109,40 +113,29 @@ export default function ParcelConfirmedScreen() {
     }
   }, [phase]);
 
-  // Animate vehicle along route
-  const animateAlongRoute = useCallback(
-    (route: { latitude: number; longitude: number }[], nextPhase: Phase) => {
-      let idx = 0;
-      setTrailCoords([route[0]]);
-      setVehiclePos(route[0]);
-
-      moveInterval.current = setInterval(() => {
-        idx += 1;
-        if (idx >= route.length) {
-          if (moveInterval.current) clearInterval(moveInterval.current);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setPhase(nextPhase);
-          setTrailCoords([]);
-          return;
-        }
-        setVehiclePos(route[idx]);
-        setTrailCoords((prev) => [...prev, route[idx]]);
-      }, MOVE_INTERVAL_MS);
-    },
-    [],
-  );
-
-  // Start vehicle animation when phase changes to toPickup or delivering
+  // AWS IoT Core Live GPS Tracking
   useEffect(() => {
-    if (phase === "toPickup" && toPickupRoute.length > 1) {
-      animateAlongRoute(toPickupRoute, "delivering");
-    } else if (phase === "delivering" && deliveryRoute.length > 1) {
-      animateAlongRoute(deliveryRoute, "delivered");
-    }
+    if (!token || !user?.id) return;
+
+    ioTClient.connect(token).then(() => {
+      // Subscribe to this specific parcel's tracking topic (using user ID)
+      const topic = `ridego/rides/${user.id}/location`;
+      
+      ioTClient.subscribe(topic, (payload) => {
+        if (payload.latitude && payload.longitude) {
+          const newPos = { latitude: payload.latitude, longitude: payload.longitude };
+          setVehiclePos(newPos);
+          setTrailCoords((prev) => [...prev, newPos]);
+        }
+      });
+    }).catch(console.error);
+
     return () => {
-      if (moveInterval.current) clearInterval(moveInterval.current);
+      if (user?.id) {
+        ioTClient.unsubscribe(`ridego/rides/${user.id}/location`);
+      }
     };
-  }, [phase, toPickupRoute, deliveryRoute, animateAlongRoute]);
+  }, [token, user]);
 
   const config = statusConfig[phase];
 

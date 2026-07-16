@@ -3,9 +3,22 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
+import { SvgXml } from 'react-native-svg';
 
-// Ensure you have these colors defined or replace them with direct hex values:
-// const Colors = { primary: '#FFB124', dark: '#1F1F1F', white: '#fff', grey: '#8E8E8E' };
+const bikeXml = `<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g filter="url(#shadow)">
+    <rect x="18" y="28" width="4" height="8" rx="2" fill="#333333" />
+    <rect x="18" y="4" width="4" height="8" rx="2" fill="#333333" />
+    <rect x="16" y="8" width="8" height="24" rx="3" fill="#F59E0B" />
+    <rect x="17" y="18" width="6" height="10" rx="2" fill="#111827" />
+    <path d="M14 12 L26 12" stroke="#111827" stroke-width="2" stroke-linecap="round" />
+  </g>
+  <defs>
+    <filter id="shadow" x="0" y="0" width="40" height="40" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3" />
+    </filter>
+  </defs>
+</svg>`;
 
 // -------------------------------------------------------------
 // HELPER FUNCTIONS
@@ -168,11 +181,7 @@ export default function LiveTrackingMap() {
           style={{ zIndex: 10 }}
         >
           <View style={styles.vehicleMarkerContainer}>
-            <MaterialCommunityIcons 
-              name="car" 
-              size={36} 
-              color={Colors?.primary || '#FFB124'} 
-            />
+            <SvgXml xml={bikeXml} width="40" height="40" />
           </View>
         </Marker>
         

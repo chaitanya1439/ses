@@ -26,7 +26,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'performance', emoji: '🎯', label: 'Performance', route: '/performance' },
   { id: 'profile-info', emoji: '👤', label: 'Profile Info', route: '/profile-info' },
   { id: 'driver-id', emoji: '🪪', label: 'Driver ID Card', route: '/driver-id-card' },
-  { id: 'documents', emoji: '📋', label: 'Documents (RC, DL, PAN)', route: '/driving-license' },
+  { id: 'documents', emoji: '📋', label: 'Documents (RC, DL, PAN)', route: '/driver-documents' },
   { id: 'language', emoji: 'अA', label: 'Language Settings' },
 ];
 

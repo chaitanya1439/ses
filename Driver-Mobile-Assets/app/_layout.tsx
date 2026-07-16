@@ -43,6 +43,7 @@ function RootLayoutNav() {
       <Stack.Screen name="earnings-overview" />
       <Stack.Screen name="all-orders" />
       <Stack.Screen name="driver-rewards" />
+      <Stack.Screen name="rate-card" />
       <Stack.Screen name="subscription-plans" />
       <Stack.Screen name="subscription-confirm" />
       <Stack.Screen name="insurances" />

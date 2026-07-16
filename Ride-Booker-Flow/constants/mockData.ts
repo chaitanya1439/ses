@@ -54,6 +54,7 @@ export const vehicleOptions = [
     iconSet: "MaterialCommunityIcons" as const,
     useCustomImage: true,
   },
+  /*
   {
     id: "auto",
     name: "Auto",
@@ -65,6 +66,7 @@ export const vehicleOptions = [
     iconName: "rickshaw" as const,
     iconSet: "MaterialCommunityIcons" as const,
   },
+  */
   {
     id: "parcel",
     name: "Parcel",

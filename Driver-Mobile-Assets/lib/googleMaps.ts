@@ -75,8 +75,11 @@ export async function fetchDirectionsPolyline(
             return [origin, destination];
         }
 
-        const encoded = data.routes[0].overview_polyline.points;
-        return [origin, ...decodePolyline(encoded), destination];
+        const points: LatLng[] = [];
+        data.routes[0].legs[0].steps.forEach((step: any) => {
+            points.push(...decodePolyline(step.polyline.points));
+        });
+        return points;
     } catch (error) {
         console.warn("Directions API error:", error);
         return [origin, destination];

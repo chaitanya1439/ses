@@ -73,7 +73,11 @@ async function fetchRoute(
     const res = await fetch(url);
     const data = await res.json();
     if (data.routes && data.routes.length > 0) {
-      return decodePolyline(data.routes[0].overview_polyline.points);
+      const points: { latitude: number; longitude: number }[] = [];
+      data.routes[0].legs[0].steps.forEach((step: any) => {
+        points.push(...decodePolyline(step.polyline.points));
+      });
+      return points;
     }
   } catch (e) {
     console.warn('Failed to fetch directions:', e);
@@ -133,13 +137,22 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
 
   // Fetch pickup → drop route
   useEffect(() => {
-    fetchRoute(pickupLat, pickupLng, dropLat, dropLng).then(setPickupToDropRoute);
+    fetchRoute(pickupLat, pickupLng, dropLat, dropLng).then(points => {
+      // Pad with exact marker coords so line visually touches the pins
+      const pickup = { latitude: pickupLat, longitude: pickupLng };
+      const drop = { latitude: dropLat, longitude: dropLng };
+      setPickupToDropRoute([pickup, ...points, drop]);
+    });
   }, [pickupLat, pickupLng, dropLat, dropLng]);
 
   // Fetch driver → pickup route when driver location is available
   useEffect(() => {
     if (driverLocation) {
-      fetchRoute(driverLocation.latitude, driverLocation.longitude, pickupLat, pickupLng).then(setDriverToPickupRoute);
+      fetchRoute(driverLocation.latitude, driverLocation.longitude, pickupLat, pickupLng).then(points => {
+        const origin = { latitude: driverLocation.latitude, longitude: driverLocation.longitude };
+        const dest = { latitude: pickupLat, longitude: pickupLng };
+        setDriverToPickupRoute([origin, ...points, dest]);
+      });
     }
   }, [driverLocation, pickupLat, pickupLng]);
 

@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { PUBLIC_WEBSOCKET_URL } from '@/constants/config';
+import { ioTClient } from '@/lib/aws-iot';
 
 interface SocketContextType {
-  socket: WebSocket | null;
+  socket: any | null; // Keeping for compatibility, but it will be ioTClient
   isConnected: boolean;
   sendMessage: (type: string, payload?: any) => void;
   sendThrottledMessage: (type: string, payload?: any, throttleMs?: number) => void;
@@ -18,17 +18,12 @@ const SocketContext = createContext<SocketContextType>({
   subscribe: () => () => {},
 });
 
-const EXPECTED_BACKGROUND_EVENTS = new Set(['auth_success', 'nearby_drivers', 'sync_state']);
-
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider' | 'driver', userId: string, token?: string }> = ({ children, role, userId, token }) => {
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<WebSocket | null>(null);
-  const retryCountRef = useRef(0);
-  const pendingMessagesRef = useRef<string[]>([]);
   
-  // 3. Event Emitter pattern for components to easily subscribe to specific real-time events
+  // Event Emitter pattern for components to easily subscribe to specific real-time events
   const listenersRef = useRef<{ [type: string]: Set<(payload: any) => void> }>({});
 
   const subscribe = useCallback((type: string, callback: (payload: any) => void) => {
@@ -43,134 +38,84 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
     };
   }, []);
 
-  // Track whether we should reconnect. Refs for the connect/cleanup lifecycle.
-  const shouldReconnectRef = useRef(true);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const connectFnRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    shouldReconnectRef.current = true;
-
-    const connect = () => {
-      // Don't create a new connection if one is already open/connecting
-      if (
-        socketRef.current &&
-        (socketRef.current.readyState === WebSocket.OPEN ||
-         socketRef.current.readyState === WebSocket.CONNECTING)
-      ) {
-        return;
+  // Central MQTT message router
+  const handleIncomingMessage = useCallback((message: any) => {
+    try {
+      // Dispatch to components that subscribed to this specific event type
+      if (message.type && listenersRef.current[message.type]) {
+        listenersRef.current[message.type].forEach(cb => cb(message.payload || message));
+      } else {
+        console.log(`[IoT] Unhandled message type:`, message.type);
       }
-
-      // Pass token in URL for HTTP Upgrade authentication
-      const urlWithAuth = token ? `${PUBLIC_WEBSOCKET_URL}?token=${encodeURIComponent(token)}` : PUBLIC_WEBSOCKET_URL;
-      
-      console.log(`[Socket] ═══ RIDER AUTH DEBUG ═══`);
-      console.log(`[Socket] PUBLIC_WEBSOCKET_URL: ${PUBLIC_WEBSOCKET_URL}`);
-      console.log(`[Socket] Token present: ${!!token}`);
-      console.log(`[Socket] Token value: ${token ? token.substring(0, 40) + '...' : 'NONE'}`);
-      console.log(`[Socket] Role: ${role}, UserId: ${userId}`);
-      console.log(`[Socket] Full connect URL: ${urlWithAuth.substring(0, 80)}...`);
-      
-      const ws = new WebSocket(urlWithAuth);
-      socketRef.current = ws;
-
-      ws.onopen = () => {
-        console.log(`[Socket] Connected to ${PUBLIC_WEBSOCKET_URL}`);
-        setIsConnected(true);
-        retryCountRef.current = 0; // Reset backoff on success
-        ws.send(JSON.stringify({ type: 'auth', role, id: userId }));
-
-        // Flush pending messages
-        while (pendingMessagesRef.current.length > 0 && ws.readyState === WebSocket.OPEN) {
-          const queuedMessage = pendingMessagesRef.current.shift();
-          if (queuedMessage) ws.send(queuedMessage);
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          // Dispatch to components that subscribed to this specific event type
-          if (data.type && listenersRef.current[data.type]) {
-            listenersRef.current[data.type].forEach(cb => cb(data.payload || data));
-          } else if (!EXPECTED_BACKGROUND_EVENTS.has(data.type)) {
-            console.log(`[Socket] Unhandled message:`, data);
-          }
-        } catch (e) {
-          console.error('[Socket] Failed to parse message', e);
-        }
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        socketRef.current = null;
-        if (!shouldReconnectRef.current) return;
-        // Exponential Backoff with Jitter (prevents 'Thundering Herd' DDoS on server restart)
-        const baseDelay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
-        const jitter = Math.random() * 1000;
-        const totalDelay = baseDelay + jitter;
-        
-        console.log(`[Socket] Disconnected. Reconnecting in ${Math.round(totalDelay)}ms...`);
-        retryCountRef.current += 1;
-        
-        reconnectTimeoutRef.current = setTimeout(connect, totalDelay);
-      };
-
-      ws.onerror = (error) => {
-        console.warn('[Socket] Connection issue — will retry', {
-          readyState: ws.readyState,
-        });
-        ws.close();
-      };
-    };
-
-    connectFnRef.current = connect;
-    connect();
-
-    return () => {
-      shouldReconnectRef.current = false;
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (socketRef.current) socketRef.current.close();
-      socketRef.current = null;
-    };
-  }, [role, token, userId]);
-
-  // ── AppState-aware reconnection ────────────────────────────────────────────
-  // When the app returns from background, the OS may have silently dropped
-  // the WebSocket. Force an immediate reconnect attempt.
-  useEffect(() => {
-    let lastState: AppStateStatus = AppState.currentState;
-
-    const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (lastState.match(/inactive|background/) && nextState === 'active') {
-        console.log('[Socket] App returned to foreground — checking connection…');
-        const ws = socketRef.current;
-        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-          retryCountRef.current = 0; // Reset backoff for immediate reconnect
-          connectFnRef.current?.();
-        }
-      }
-      lastState = nextState;
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription.remove();
-  }, []);
-
-  const sendMessage = useCallback((type: string, payload: any = {}) => {
-    const message = JSON.stringify({ type, ...payload });
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(message);
-    } else {
-      pendingMessagesRef.current.push(message);
-      if (pendingMessagesRef.current.length > 50) {
-        pendingMessagesRef.current.shift();
-      }
-      console.warn('[Socket] Queued message until socket reconnects');
+    } catch (e) {
+      console.error('[IoT] Failed to process message', e);
     }
   }, []);
 
-  // 4. Client-Side Event Throttling
+  useEffect(() => {
+    let isMounted = true;
+
+    const connectIoT = async () => {
+      if (!token || !userId) return;
+
+      try {
+        console.log(`[IoT] Connecting to AWS IoT Core for Rider ${userId}...`);
+        await ioTClient.connect(token);
+        
+        if (!isMounted) return;
+        setIsConnected(true);
+        console.log(`[IoT] Connected to AWS IoT Core!`);
+
+        // Subscribe to Rider's personal inbox
+        ioTClient.subscribe(`ridego/users/${userId}/inbox`, handleIncomingMessage);
+        
+        // Subscribe to global broadcasts (e.g., nearby drivers)
+        ioTClient.subscribe(`ridego/system/broadcast`, handleIncomingMessage);
+        
+        // Subscribe to Rider's active trip events (status updates, cancellation)
+        ioTClient.subscribe(`ridego/rides/${userId}/events`, handleIncomingMessage);
+        
+      } catch (error) {
+        // Gracefully degrade - app continues to work, just without real-time features
+        console.warn('[IoT] Failed to connect (app will work in offline mode):', error);
+        if (isMounted) setIsConnected(false);
+      }
+    };
+
+    // Wrap in setTimeout to prevent blocking app startup
+    setTimeout(() => connectIoT(), 1000);
+
+    return () => {
+      isMounted = false;
+      if (userId) {
+        ioTClient.unsubscribe(`ridego/users/${userId}/inbox`, handleIncomingMessage);
+        ioTClient.unsubscribe(`ridego/system/broadcast`, handleIncomingMessage);
+        ioTClient.unsubscribe(`ridego/rides/${userId}/events`, handleIncomingMessage);
+      }
+    };
+  }, [token, userId, handleIncomingMessage]);
+
+  const sendMessage = useCallback((type: string, payload: any = {}) => {
+    const message = { type, ...payload };
+    
+    // Route messages to specific MQTT topics based on type
+    if (type === 'ride_request') {
+      ioTClient.publish(`ridego/system/requests`, message);
+    } else if (type === 'CHAT_MESSAGE') {
+      // Payload for chat has 'to' (driverId)
+      if (payload.to) {
+        ioTClient.publish(`ridego/users/${payload.to}/inbox`, message);
+      }
+    } else if (type === 'ride_cancel') {
+      // Publish to the specific ride's event topic (Driver will be listening to it)
+      ioTClient.publish(`ridego/rides/${userId}/events`, message);
+    } else {
+      // Default fallback
+      ioTClient.publish(`ridego/system/broadcast`, message);
+    }
+  }, [userId]);
+
+  // Client-Side Event Throttling
   const lastSendRef = useRef<{ [type: string]: number }>({});
   const sendThrottledMessage = useCallback((type: string, payload: any = {}, throttleMs: number = 1000) => {
     const now = Date.now();
@@ -181,7 +126,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
   }, [sendMessage]);
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, isConnected, sendMessage, sendThrottledMessage, subscribe }}>
+    <SocketContext.Provider value={{ socket: ioTClient, isConnected, sendMessage, sendThrottledMessage, subscribe }}>
       {children}
     </SocketContext.Provider>
   );

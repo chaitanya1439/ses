@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { ioTClient } from "@/lib/aws-iot";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   View,
   Text,
@@ -23,7 +25,7 @@ import { mockDriver, vehicleOptions } from "@/constants/mockData";
 import { fetchDirectionsPolyline } from "@/lib/googleMaps";
 import { customMapStyle } from "@/constants/mapStyle";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { BikeIcon, AutoIcon } from "@/components/VehicleIcons";
+import { BikeIcon, AutoIcon, ScootyIcon, SheBikeIcon, ParcelIcon } from "@/components/VehicleIcons";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -85,6 +87,7 @@ export default function BookingConfirmedScreen() {
   const insets = useSafeAreaInsets();
   const { pickup, drop, selectedVehicle, clearBooking } = useBooking();
   const { subscribe, sendMessage } = useSocket();
+  const { token, user } = useAuth();
 
   const params = useLocalSearchParams();
   const initPayloadStr = params.payload as string;
@@ -390,38 +393,45 @@ export default function BookingConfirmedScreen() {
         }
       });
 
-      // 🚀 Realtime Integration: Live driver location tracking
+      // 🚀 Realtime Integration: Live driver location tracking (AWS IoT Core)
       // When a driver is on their way to pickup, receive their GPS position in real-time
-      const unsubDriverLoc = subscribe('driver_location', (payload) => {
-        if (cancelled) return;
-        if (payload.location?.lat != null && payload.location?.lng != null) {
-          // If confirmed, stop the dummy animation and use live location
-          if (!cancelled) {
-            setIsConfirmed(true);
-            if (animIdRef.current) {
-              cancelAnimationFrame(animIdRef.current);
-              animIdRef.current = null;
+      if (token && user?.id) {
+        ioTClient.connect(token).then(() => {
+          ioTClient.subscribe(`ridego/rides/${user.id}/location`, (payload) => {
+            if (cancelled) return;
+            if (payload.latitude != null && payload.longitude != null) {
+              // If confirmed, stop the dummy animation and use live location
+              if (!cancelled) {
+                setIsConfirmed(true);
+                if (animIdRef.current) {
+                  cancelAnimationFrame(animIdRef.current);
+                  animIdRef.current = null;
+                }
+                
+                // Trigger smooth animation and path erase
+                animateLiveLocation({ lat: payload.latitude, lng: payload.longitude, heading: payload.heading });
+              }
             }
-            
-            // Trigger smooth animation and path erase
-            animateLiveLocation(payload.location);
-          }
-        }
-      });
+          });
+        }).catch(console.error);
+      }
 
       // Cleanup subscription if unmounted
       return () => {
         unsubscribe();
         unsubNearby();
-        unsubDriverLoc();
+        if (user?.id) {
+          ioTClient.unsubscribe(`ridego/rides/${user.id}/location`);
+        }
       };
     })();
 
     return () => {
       cancelled = true;
       if (animIdRef.current) cancelAnimationFrame(animIdRef.current);
+      if (liveAnimIdRef.current) cancelAnimationFrame(liveAnimIdRef.current);
     };
-  }, [animateMarker, dropCoord, initialDriverCoord, pickupCoord, subscribe]);
+  }, [animateLiveLocation, animateMarker, dropCoord, initialDriverCoord, pickupCoord, subscribe, token, user]);
 
   // ─── ETA countdown & step progression ────────────────────────────────────────
 

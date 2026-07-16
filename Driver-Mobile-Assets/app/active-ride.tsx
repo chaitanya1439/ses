@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Platform, Dimensions,
 } from 'react-native';
@@ -14,6 +14,9 @@ import { RideMap } from '@/components/RideMap';
 import { theme } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TextInput, KeyboardAvoidingView } from 'react-native';
+import * as Location from 'expo-location';
+import { ioTClient } from '@/lib/aws-iot';
+import { useAuth } from '@/context/AuthContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -54,10 +57,56 @@ export default function ActiveRideScreen() {
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState('');
 
+  const { driver } = useAuth();
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
 
   // The riderId from the real-time ride request (for server communication)
   const riderId = (activeRide as any)?.riderId || activeRide?.customer?.id;
+
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription;
+
+    const startTracking = async () => {
+      if (!activeRide || !driver?.token) return;
+
+      try {
+        await ioTClient.connect(driver.token);
+
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            distanceInterval: 10,
+            timeInterval: 2000,
+          },
+          (loc) => {
+            if (activeRide) {
+              const payload = {
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+                heading: loc.coords.heading,
+                speed: loc.coords.speed,
+                timestamp: Date.now(),
+              };
+              ioTClient.publish(`ridego/rides/${riderId}/location`, payload);
+            }
+          }
+        );
+      } catch (err) {
+        console.error('Tracking Error:', err);
+      }
+    };
+
+    startTracking();
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, [activeRide, driver, riderId]);
 
   if (!activeRide) {
     return (

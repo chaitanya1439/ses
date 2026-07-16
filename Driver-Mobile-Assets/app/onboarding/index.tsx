@@ -30,7 +30,7 @@ export default function OnboardingIndex() {
   const handleFinish = () => {
     if (allVerified) {
       updateDriver({ isVerified: true });
-      router.replace('/(tabs)/home');
+      router.replace({ pathname: '/rate-card', params: { isNewDriver: 'true' } } as any);
     }
   };
 

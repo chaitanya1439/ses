@@ -8,12 +8,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SubscriptionConfirmScreen() {
   const insets = useSafeAreaInsets();
+  const { isNewDriver } = useLocalSearchParams();
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
 
   return (
@@ -113,9 +114,14 @@ export default function SubscriptionConfirmScreen() {
             styles.payBtn,
             { opacity: pressed ? 0.85 : 1 },
           ]}
-          onPress={() =>
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-          }
+          onPress={() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (isNewDriver) {
+              router.replace('/permissions');
+            } else {
+              router.replace('/(tabs)/home');
+            }
+          }}
         >
           <Text style={styles.payBtnText}>Pay ₹9</Text>
         </Pressable>

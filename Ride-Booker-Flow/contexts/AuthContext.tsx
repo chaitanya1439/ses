@@ -21,7 +21,7 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (phone: string) => Promise<void>;
+  login: (phone: string, token?: string) => Promise<void>;
   register: (name: string, phone: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -49,14 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = async (phone: string) => {
+  const login = async (phone: string, token?: string) => {
     const newUser: User = {
       id: "048489ad-c0d8-4978-9a0b-136d0b27d8f6",
       name: "Chaitanya Vellanki",
       phone,
       email: "chaitanya@email.com",
       rating: 4.9,
-      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwNDg0ODlhZC1jMGQ4LTQ5NzgtOWEwYi0xMzZkMGIyN2Q4ZjYiLCJpYXQiOjE3NjE5MTI4NDQsImV4cCI6MTc2MjUxNzY0NH0.US8Apz5qHuRkybCwdDT8XHTPBycLo66JHUIPEV6is1Y"
+      token: token || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
     };
     await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(newUser));
     setUser(newUser);

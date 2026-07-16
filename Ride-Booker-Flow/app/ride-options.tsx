@@ -24,6 +24,7 @@ import { useRequestRide } from "@/hooks/useRequestRide";
 import { vehicleOptions } from "@/constants/mockData";
 import { fetchDirectionsWithDetails } from "@/lib/googleMaps";
 import { customMapStyle } from "@/constants/mapStyle";
+import { BikeIcon, ScootyIcon, SheBikeIcon, ParcelIcon } from "@/components/VehicleIcons";
 
 export default function RideOptionsScreen() {
   const insets = useSafeAreaInsets();
@@ -173,8 +174,10 @@ export default function RideOptionsScreen() {
     if (selectedOption?.fare) {
       setFare(selectedOption.fare);
     }
-    if (selectedVehicle === "bike") {
+    if (selectedVehicle === "bike" || selectedVehicle === "bike-saver") {
       showUpsell();
+    } else if (selectedVehicle === "parcel") {
+      router.push("/review-delivery" as any);
     } else {
       // We just route to confirm-pickup. The actual request happens there.
       router.push("/confirm-pickup" as any);
@@ -230,20 +233,10 @@ export default function RideOptionsScreen() {
   }, [selectedVehicle, pickupCoord.latitude, pickupCoord.longitude]);
 
   const renderVehicleIcon = (size = 18, color = Colors.dark) => {
-    if (selectedOption?.useCustomImage || selectedVehicle === "she-bike" || selectedVehicle === "parcel") {
-      return (
-        <Image
-          source={
-            selectedVehicle === "parcel"
-              ? require("@/assets/images/parcel-icon.png")
-              : require("@/assets/images/she-bike-icon.png")
-          }
-          style={{ width: size, height: size, borderRadius: 4 }}
-          resizeMode="contain"
-        />
-      );
-    }
-    return <MaterialCommunityIcons name={(selectedOption?.iconName as any) || "motorbike"} size={size} color={color} />;
+    if (selectedVehicle === "scooty") return <ScootyIcon width={size} height={size} />;
+    if (selectedVehicle === "she-bike") return <SheBikeIcon width={size} height={size} />;
+    if (selectedVehicle === "parcel") return <ParcelIcon width={size} height={size} />;
+    return <BikeIcon width={size} height={size} />;
   };
 
   return (
@@ -264,7 +257,6 @@ export default function RideOptionsScreen() {
             }}
             showsUserLocation
             showsMyLocationButton={false}
-            showsPointsOfInterest={false}
             customMapStyle={customMapStyle}
             showsCompass={false}
           >
@@ -437,22 +429,14 @@ function VehicleRow({
       onPress={onSelect}
     >
       <View style={styles.vehicleIcon}>
-        {(item as any).useCustomImage ? (
-          <Image
-            source={
-              item.id === "parcel" 
-                ? require("@/assets/images/parcel-icon.png")
-                : require("@/assets/images/she-bike-icon.png")
-            }
-            style={{ width: 44, height: 44 }}
-            resizeMode="contain"
-          />
+        {item.id === "scooty" ? (
+          <ScootyIcon width={40} height={40} />
+        ) : item.id === "she-bike" ? (
+          <SheBikeIcon width={40} height={40} />
+        ) : item.id === "parcel" ? (
+          <ParcelIcon width={40} height={40} />
         ) : (
-          <MaterialCommunityIcons
-            name={item.iconName}
-            size={40}
-            color={Colors.dark}
-          />
+          <BikeIcon width={40} height={40} />
         )}
       </View>
       <View style={styles.vehicleInfo}>

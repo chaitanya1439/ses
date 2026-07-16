@@ -53,15 +53,6 @@ const allServices: ServiceItem[] = [
     color: "#E0F2FE",
     route: "/book-ride",
   },
-  {
-    id: "auto",
-    title: "Auto",
-    subtitle: "Affordable 3-wheeler",
-    icon: "rickshaw",
-    iconSet: "MaterialCommunityIcons",
-    color: "#F0FDF4",
-    route: "/book-ride",
-  },
 ];
 
 export default function AllServicesScreen() {

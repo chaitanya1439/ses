@@ -188,8 +188,8 @@ export default function SearchScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
       {/* Dynamic Background Gradient */}
-      <LinearGradient colors={['#F0FDF4', '#FFFFFF']} style={StyleSheet.absoluteFillObject} />
-      <LinearGradient colors={['rgba(255, 255, 255, 0)', 'rgba(238, 242, 255, 0.4)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+      <LinearGradient colors={['#F0FDF4', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['rgba(255, 255, 255, 0)', 'rgba(238, 242, 255, 0.4)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
 
       <View style={{ paddingTop: Platform.OS === "web" ? 20 : insets.top, flex: 1 }}>
         

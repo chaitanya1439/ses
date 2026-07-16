@@ -1,5 +1,4 @@
 import { Tabs, Redirect } from "expo-router";
-import { StyleSheet, View, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,7 +20,13 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          fontFamily: 'Poppins_600SemiBold',
+          marginTop: -2,
+        },
         tabBarStyle: {
           position: "absolute",
           bottom: 0,
@@ -49,44 +54,27 @@ function ClassicTabLayout() {
         name="home"
         options={{
           title: "Home",
-          tabBarIcon: ({ focused }) => (
-            <View style={styles.homeTab}>
-              <Ionicons
-                name={focused ? "home" : "home-outline"}
-                size={22}
-                color={focused ? theme.colors.text : theme.colors.textMuted}
-              />
-              <Text style={[
-                styles.homeLabel,
-                { color: focused ? theme.colors.text : theme.colors.textMuted }
-              ]}>
-                Home
-              </Text>
-            </View>
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
 
-      {/* ORDERS TAB — pill */}
+      {/* ORDERS TAB */}
       <Tabs.Screen
         name="orders"
         options={{
           title: "Orders",
-          href: "/orders",
-          tabBarIcon: ({ focused }) => (
-            <View style={[styles.ordersPill, focused && styles.ordersPillActive]}>
-              <Ionicons
-                name={focused ? "list" : "list-outline"}
-                size={16}
-                color={focused ? theme.colors.text : theme.colors.textMuted}
-              />
-              <Text style={[
-                styles.ordersLabel,
-                { color: focused ? theme.colors.text : theme.colors.textMuted }
-              ]}>
-                Orders
-              </Text>
-            </View>
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? "list" : "list-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -128,34 +116,3 @@ export default function TabLayout() {
 
   return <ClassicTabLayout />;
 }
-
-const styles = StyleSheet.create({
-  homeTab: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  homeLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  ordersPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  ordersPillActive: {
-    backgroundColor: '#EEEEEE',
-  },
-  ordersLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: 'Poppins_600SemiBold',
-  },
-});

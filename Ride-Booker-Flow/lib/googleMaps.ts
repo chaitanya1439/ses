@@ -76,9 +76,11 @@ export async function fetchDirectionsPolyline(
             return [origin, destination];
         }
 
-        const encoded = data.routes[0].overview_polyline.points;
-        // Pad with exact origin and destination to prevent visual gaps when zooming
-        return [origin, ...decodePolyline(encoded), destination];
+        const points: LatLng[] = [];
+        data.routes[0].legs[0].steps.forEach((step: any) => {
+            points.push(...decodePolyline(step.polyline.points));
+        });
+        return points;
     } catch (error) {
         console.warn("Directions API error:", error);
         return [origin, destination];
@@ -111,12 +113,15 @@ export async function fetchDirectionsWithDetails(
         if (data.status !== "OK" || !data.routes?.length) return null;
 
         const leg = data.routes[0].legs[0];
-        const encoded = data.routes[0].overview_polyline.points;
+        const points: LatLng[] = [];
+        leg.steps.forEach((step: any) => {
+            points.push(...decodePolyline(step.polyline.points));
+        });
 
         return {
             distanceMeters: leg.distance.value,
             durationSeconds: leg.duration.value,
-            polyline: [origin, ...decodePolyline(encoded), destination],
+            polyline: points,
         };
     } catch (error) {
         console.warn("Directions with details error:", error);

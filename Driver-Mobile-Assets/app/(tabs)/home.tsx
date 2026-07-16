@@ -16,13 +16,13 @@ import { EarningsBanner } from '@/components/EarningsBanner';
 import { ProgressCard } from '@/components/ProgressCard';
 import { GreetingSection } from '@/components/GreetingSection';
 import { QuickActionIcons } from '@/components/QuickActionIcons';
-import { OnlyForYouCard } from '@/components/OnlyForYouCard';
 import { NightFareModal } from '@/components/NightFareModal';
 import { GoToZoneSheet } from '@/components/GoToZoneSheet';
 
 import { HomeMap } from '@/components/HomeMap';
 import { SideDrawer } from '@/components/SideDrawer';
 import { theme } from '@/constants/colors';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -39,6 +39,9 @@ export default function HomeScreen() {
   const [showNightFare, setShowNightFare] = useState(false);
   const [showGoToZone, setShowGoToZone] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // BottomSheet snap points
+  const snapPoints = React.useMemo(() => ['30%', '85%'], []);
 
   // === Location Tracking ===
   useLocationTracking({
@@ -136,7 +139,7 @@ export default function HomeScreen() {
     if (!isOnDuty) return;
     
     // Dynamically listen to actual incoming ride requests broadcast from Realtime-Server
-    const unsub = subscribe('new_ride_request', (data) => {
+    const unsub = subscribe('ride_request', (data) => {
       // Extract pickup/drop coordinates
       const pickupLat = data.pickupLat || data.pickupLocation?.lat || 17.385;
       const pickupLng = data.pickupLng || data.pickupLocation?.lng || 78.4867;
@@ -217,13 +220,30 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
-        bounces
-      >
-        {/* === TOP NAVIGATION BAR === */}
+      {/* === BACKGROUND LAYER (MAP OR GREETING) === */}
+      <View style={StyleSheet.absoluteFillObject}>
+        {isOnDuty ? (
+          <View style={styles.fullScreenBg}>
+            <HomeMap />
+            {/* Zone badge overlay */}
+            <View style={[styles.zoneBadge, { top: insets.top + 70 }]}>
+              <MaterialCommunityIcons name="map-marker-radius" size={16} color="#FFF" />
+              <Text style={styles.zoneBadgeText}>₹12/km Guaranteed Earn...</Text>
+            </View>
+            {/* Close map X button */}
+            <Pressable style={[styles.mapCloseBtn, { top: insets.top + 70, bottom: 'auto' }]} onPress={() => setIsOnDuty(false)}>
+              <Ionicons name="close" size={22} color={theme.colors.textMuted} />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={[styles.fullScreenBg, { paddingTop: insets.top + 70 }]}>
+            <GreetingSection driverName={driverName} />
+          </View>
+        )}
+      </View>
+
+      {/* === FIXED TOP NAVIGATION BAR === */}
+      <View style={styles.fixedTopBar}>
         <TopNavBar
           isOnDuty={isOnDuty}
           onToggle={setIsOnDuty}
@@ -231,88 +251,98 @@ export default function HomeScreen() {
           onHeartPress={() => router.push('/go-to-area')}
           onBellPress={() => router.push('/notification')}
         />
+      </View>
 
-        {/* === SECTION 1 — EARNINGS BANNER === */}
-        <EarningsBanner amount={todayEarnings} />
+      {/* === PULL-UP BOTTOM SHEET === */}
+      <BottomSheet snapPoints={snapPoints} index={0}>
+        <BottomSheetScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          showsVerticalScrollIndicator={false}
+          bounces
+        >
+          {/* === SECTION 1 — EARNINGS BANNER === */}
+          <EarningsBanner amount={todayEarnings} />
 
-        {/* === SECTION 2 — PROGRESS CARD === */}
-        <ProgressCard
-          completedOrders={todayRides}
-          onKnowMore={() => router.push('/active-ride')}
-        />
+          {/* === SECTION 2 — PROGRESS CARD === */}
+          <ProgressCard
+            completedOrders={todayRides}
+            onKnowMore={() => router.push('/active-ride')}
+          />
 
-        {/* === SECTION 3 — GREETING or MAP === */}
-        {isOnDuty ? (
-          <View style={styles.mapSection}>
-            <HomeMap />
-            {/* Zone badge overlay */}
-            <View style={styles.zoneBadge}>
-              <MaterialCommunityIcons name="map-marker-radius" size={16} color="#FFF" />
-              <Text style={styles.zoneBadgeText}>₹12/km Guaranteed Earn...</Text>
+          {/* === SECTION 3 — EARNING PLAN PROMO === */}
+          <Pressable 
+            style={[styles.promoCard, { marginTop: 16 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/subscription-plans' as any);
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.promoTitle}>Choose your earning plan</Text>
+              <View style={styles.promoBtn}>
+                <Text style={styles.promoBtnText}>View All Plans →</Text>
+              </View>
             </View>
-            {/* Close map X button */}
-            <Pressable style={styles.mapCloseBtn} onPress={() => setIsOnDuty(false)}>
-              <Ionicons name="close" size={22} color={theme.colors.textMuted} />
-            </Pressable>
+            <View style={styles.planBadge}>
+              <Text style={styles.planBadgeSmall}>MY</Text>
+              <Text style={styles.planBadgeLarge}>PLAN</Text>
+              <Text style={styles.planBadgeRupee}>₹₹</Text>
+            </View>
+          </Pressable>
+
+          {/* === SECTION 4 — QUICK ACTION ICONS ROW === */}
+          <QuickActionIcons
+            onFunnyPress={() => router.push('/tutorial-funny')}
+            onFilterPress={() => router.push('/tutorial-filter')}
+            onGoToPress={() => router.push('/tutorial-goto')}
+            onPlansPress={() => router.push('/tutorial-plans')}
+          />
+
+          {/* === SECTION 5 — QUICK ACTIONS HEADING === */}
+          <View style={styles.quickActionsSection}>
+            <Text style={styles.quickActionsTitle}>Quick actions</Text>
+
+            <View style={styles.quickActionsRow}>
+              <Pressable
+                style={styles.quickActionCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/active-ride');
+                }}
+              >
+                <MaterialCommunityIcons name="road-variant" size={28} color={theme.colors.primary} />
+                <Text style={styles.quickActionValue}>{todayRides}</Text>
+                <Text style={styles.quickActionLabel}>Completed</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.quickActionCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/subscription' as any);
+                }}
+              >
+                <MaterialCommunityIcons name="crown" size={28} color={theme.colors.purple} />
+                <Text style={[styles.quickActionValue, { color: theme.colors.purple }]}>Active</Text>
+                <Text style={styles.quickActionLabel}>Recharge</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.quickActionCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/parcel-delivery');
+                }}
+              >
+                <MaterialCommunityIcons name="package-variant" size={28} color={theme.colors.teal} />
+                <Text style={[styles.quickActionValue, { color: theme.colors.teal }]}>40%</Text>
+                <Text style={styles.quickActionLabel}>More Earnings</Text>
+              </Pressable>
+            </View>
           </View>
-        ) : (
-          <GreetingSection driverName={driverName} />
-        )}
-
-        {/* === SECTION 4 — QUICK ACTION ICONS ROW === */}
-        <QuickActionIcons
-          onFunnyPress={() => router.push('/tutorial-funny')}
-          onFilterPress={() => router.push('/tutorial-filter')}
-          onGoToPress={() => router.push('/tutorial-goto')}
-          onPlansPress={() => router.push('/tutorial-plans')}
-        />
-
-        {/* === SECTION 5 — "ONLY FOR YOU" PROMOTIONAL SECTION === */}
-        <OnlyForYouCard />
-
-        {/* === SECTION 6 — QUICK ACTIONS HEADING === */}
-        <View style={styles.quickActionsSection}>
-          <Text style={styles.quickActionsTitle}>Quick actions</Text>
-
-          <View style={styles.quickActionsRow}>
-            <Pressable
-              style={styles.quickActionCard}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/active-ride');
-              }}
-            >
-              <MaterialCommunityIcons name="road-variant" size={28} color={theme.colors.primary} />
-              <Text style={styles.quickActionValue}>{todayRides}</Text>
-              <Text style={styles.quickActionLabel}>Completed</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.quickActionCard}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/subscription');
-              }}
-            >
-              <MaterialCommunityIcons name="crown" size={28} color={theme.colors.purple} />
-              <Text style={[styles.quickActionValue, { color: theme.colors.purple }]}>Active</Text>
-              <Text style={styles.quickActionLabel}>Recharge</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.quickActionCard}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/parcel-delivery');
-              }}
-            >
-              <MaterialCommunityIcons name="package-variant" size={28} color={theme.colors.teal} />
-              <Text style={[styles.quickActionValue, { color: theme.colors.teal }]}>40%</Text>
-              <Text style={styles.quickActionLabel}>More Earnings</Text>
-            </Pressable>
-          </View>
-        </View>
-      </ScrollView>
+        </BottomSheetScrollView>
+      </BottomSheet>
 
       {/* === MODALS === */}
       <NightFareModal
@@ -349,13 +379,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-
-  // Map section
-  mapSection: {
-    height: screenHeight * 0.35,
-    position: 'relative',
-    overflow: 'hidden',
+  fixedTopBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
+  fullScreenBg: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: theme.colors.surfaceAlt,
+  },
+  // Map section overlay buttons
   zoneBadge: {
     position: 'absolute',
     top: 16,
@@ -426,5 +462,64 @@ const styles = StyleSheet.create({
     color: theme.colors.textLight,
     fontFamily: 'Poppins_400Regular',
     textAlign: 'center',
+  },
+  /* Promo Card (Offline Ad) */
+  promoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A2E',
+    borderRadius: 14,
+    padding: 20,
+    marginHorizontal: 16,
+    marginTop: 0,
+    marginBottom: 10,
+  },
+  promoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_700Bold',
+    marginBottom: 12,
+  },
+  promoBtn: {
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  promoBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  planBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    backgroundColor: '#4A6CF7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  planBadgeSmall: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_700Bold',
+  },
+  planBadgeLarge: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFB800',
+    fontFamily: 'Poppins_700Bold',
+    marginTop: -2,
+  },
+  planBadgeRupee: {
+    fontSize: 10,
+    color: '#FFB800',
+    fontFamily: 'Poppins_700Bold',
   },
 });
