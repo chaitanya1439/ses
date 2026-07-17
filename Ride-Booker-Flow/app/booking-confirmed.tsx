@@ -87,7 +87,8 @@ export default function BookingConfirmedScreen() {
   const insets = useSafeAreaInsets();
   const { pickup, drop, selectedVehicle, clearBooking } = useBooking();
   const { subscribe, sendMessage } = useSocket();
-  const { token, user } = useAuth();
+  const { user } = useAuth();
+  const token = user?.token;
 
   const params = useLocalSearchParams();
   const initPayloadStr = params.payload as string;
