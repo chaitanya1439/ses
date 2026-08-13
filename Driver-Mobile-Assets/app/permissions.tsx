@@ -50,7 +50,7 @@ export default function PermissionsScreen() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+          try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
           setCheckedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id); else next.add(id);
@@ -58,7 +58,7 @@ export default function PermissionsScreen() {
           });
         }
       } catch {
-        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
         setCheckedIds(prev => {
           const next = new Set(prev);
           if (next.has(id)) next.delete(id); else next.add(id);
@@ -66,7 +66,7 @@ export default function PermissionsScreen() {
         });
       }
     } else {
-      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
       setCheckedIds(prev => {
         const next = new Set(prev);
         if (next.has(id)) next.delete(id); else next.add(id);
@@ -128,7 +128,7 @@ export default function PermissionsScreen() {
           ]}
           onPress={() => {
             if (!allGranted) return;
-            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (e) {}
+            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
             router.replace('/(tabs)/home');
           }}
           disabled={!allGranted}

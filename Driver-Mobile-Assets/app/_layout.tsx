@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -26,12 +26,12 @@ function RootLayoutNav() {
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="otp" />
-      <Stack.Screen name="register" />
-      <Stack.Screen name="permissions" />
+            <Stack.Screen name="permissions" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="active-ride" />
       <Stack.Screen name="subscription" />
+      <Stack.Screen name="registration-fee" />
       <Stack.Screen name="parcel-delivery" />
       <Stack.Screen name="driver-id-card" />
       <Stack.Screen name="profile-info" />
@@ -54,19 +54,28 @@ function RootLayoutNav() {
       <Stack.Screen name="tutorial-plans" />
       <Stack.Screen name="notification" />
       <Stack.Screen name="go-to-area" />
+      <Stack.Screen name="driver-scanner" />
     </Stack>
   );
 }
 
 function SocketWrapper({ children }: { children: React.ReactNode }) {
-  const { driver } = useAuth();
+  const { driver, logout } = useAuth();
   if (!driver) return <>{children}</>;
+  
+  const handleForceLogout = async () => {
+    alert("You have been logged out because another app is active on this device.");
+    await logout();
+    router.replace('/login');
+  };
+
   return (
     <SocketProvider 
       role="driver" 
       userId={driver.id}
       token={driver.token}
       vehicleType={driver.vehicleType}
+      onForceLogout={handleForceLogout}
     >
       {children}
     </SocketProvider>

@@ -34,7 +34,7 @@ const allServices: ServiceItem[] = [
     icon: "package-variant-closed",
     iconSet: "MaterialCommunityIcons",
     color: "#FEF3C7",
-    route: "/(tabs)/parcel",
+    route: "/parcel",
   },
   {
     id: "she-bike",

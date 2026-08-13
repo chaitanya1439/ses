@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -66,13 +67,17 @@ export default function ProfileInfoScreen() {
         {/* ─── AVATAR ─── */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarOuter}>
-            <View style={styles.avatarCircle}>
-              <MaterialCommunityIcons
-                name="account"
-                size={52}
-                color="#9CA3AF"
-              />
-            </View>
+            {driver?.avatar ? (
+              <Image source={{ uri: driver.avatar }} style={styles.avatarCircle} />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <MaterialCommunityIcons
+                  name="account"
+                  size={52}
+                  color="#9CA3AF"
+                />
+              </View>
+            )}
             {/* Camera overlay */}
             <Pressable
               style={styles.cameraBtn}

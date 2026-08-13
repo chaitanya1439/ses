@@ -29,6 +29,8 @@ export interface ClientInfo {
   lastLocation?: Location;
   /** Driver-only: vehicle type for dispatch filtering */
   vehicleType?: string;
+  /** Unique device identifier for session exclusivity */
+  deviceId?: string;
 }
 
 // ─── Active trip record ───────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ export interface AuthMessage {
   role: ClientRole;
   id?: string;
   vehicleType?: string;
+  deviceId?: string;
 }
 
 export interface DriverStatusMessage {
@@ -178,6 +181,11 @@ export interface PingMessage {
   type: 'ping';
 }
 
+export interface InstantRideStartMessage {
+  type: 'instant_ride_start';
+  payload?: any;
+}
+
 export type InboundMessage =
   | AuthMessage
   | DriverStatusMessage
@@ -191,7 +199,8 @@ export type InboundMessage =
   | GetDemandHeatmapMessage
   | RegisterPushTokenMessage
   | UnregisterPushTokenMessage
-  | PingMessage;
+  | PingMessage
+  | InstantRideStartMessage;
 
 // ─── WebSocket message payloads (server → client) ────────────────────────────
 
@@ -249,6 +258,11 @@ export interface PushTokenAckMessage {
   success: boolean;
 }
 
+export interface ForceLogoutMessage {
+  type: 'force_logout';
+  reason?: string;
+}
+
 export type OutboundMessage =
   | AuthSuccessMessage
   | SyncStateMessage
@@ -259,4 +273,5 @@ export type OutboundMessage =
   | DemandHeatmapMessage
   | NearbyDriversMessage
   | OutboundChatMessage
-  | PushTokenAckMessage;
+  | PushTokenAckMessage
+  | ForceLogoutMessage;

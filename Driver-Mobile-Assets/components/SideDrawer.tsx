@@ -8,6 +8,7 @@ import {
   Dimensions,
   ScrollView,
   Switch,
+  Image,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,9 +115,13 @@ export function SideDrawer({ isVisible, onClose }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* PROFILE SECTION */}
           <Pressable style={styles.profileSection} onPress={() => handleMenuPress('/profile')}>
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={32} color="#9CA3AF" />
-            </View>
+            {driver?.avatar ? (
+              <Image source={{ uri: driver.avatar }} style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: '#E5E7EB' }} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={32} color="#9CA3AF" />
+              </View>
+            )}
             <View style={styles.profileTextCol}>
               <View style={styles.profileNameRow}>
                 <Text style={styles.profileName}>{driver?.name || 'My Profile'}</Text>

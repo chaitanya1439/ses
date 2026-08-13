@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,57 @@ import {
   Pressable,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SubscriptionConfirmScreen() {
   const insets = useSafeAreaInsets();
-  const { isNewDriver } = useLocalSearchParams();
+  const { isNewDriver, planPrice = '15', planEarnings = '', planDays = '' } = useLocalSearchParams();
+  const { driver, updateDriver } = useAuth();
+  const [loading, setLoading] = useState(false);
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
+
+  const handlePurchase = async () => {
+    if (!driver?.id) return;
+    
+    setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const res = await fetch('https://real.shelteric.com/buy-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId: driver.id }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Update local state if needed (not strictly required if backend enforces it, but good for UI)
+        updateDriver({ subscriptionStatus: 'active' });
+
+        if (isNewDriver) {
+          router.replace('/permissions');
+        } else {
+          router.replace('/(tabs)/home');
+        }
+      } else {
+        Alert.alert('Purchase Failed', data.error || 'Could not process subscription');
+      }
+    } catch {
+      Alert.alert('Network Error', 'Failed to connect to the server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
@@ -45,9 +86,9 @@ export default function SubscriptionConfirmScreen() {
           <View style={[styles.bgRadio, styles.bgRadioActive]}>
             <View style={styles.bgRadioInner} />
           </View>
-          <Text style={styles.bgPlanText}>₹250 Earnings</Text>
-          <Text style={styles.bgPlanText}>2 Days</Text>
-          <Text style={styles.bgPlanPrice}>₹9</Text>
+          <Text style={styles.bgPlanText}>{planEarnings} Earnings</Text>
+          <Text style={styles.bgPlanText}>{planDays} Days</Text>
+          <Text style={styles.bgPlanPrice}>₹{planPrice}</Text>
         </View>
         {/* Plan 2 */}
         <View style={styles.bgPlanCard}>
@@ -88,7 +129,7 @@ export default function SubscriptionConfirmScreen() {
           {/* Content */}
           <View style={styles.sheetContent}>
             <Text style={styles.sheetTitle}>
-              Continue to buy ₹9 Subscription plan
+              Continue to buy ₹{planPrice} Subscription plan
             </Text>
 
             {/* Feature rows */}
@@ -112,18 +153,16 @@ export default function SubscriptionConfirmScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.payBtn,
-            { opacity: pressed ? 0.85 : 1 },
+            { opacity: pressed || loading ? 0.85 : 1 },
           ]}
-          onPress={() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            if (isNewDriver) {
-              router.replace('/permissions');
-            } else {
-              router.replace('/(tabs)/home');
-            }
-          }}
+          onPress={handlePurchase}
+          disabled={loading}
         >
-          <Text style={styles.payBtnText}>Pay ₹9</Text>
+          {loading ? (
+            <ActivityIndicator color="#1A1A2E" />
+          ) : (
+            <Text style={styles.payBtnText}>Pay ₹{planPrice}</Text>
+          )}
         </Pressable>
       </View>
     </View>

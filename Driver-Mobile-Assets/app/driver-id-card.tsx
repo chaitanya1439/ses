@@ -32,7 +32,7 @@ export default function DriverIdCardScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#1A1A2E" />
           </Pressable>
-          <Text style={styles.topBarTitle}>Driver ID Card</Text>
+          <Text style={styles.topBarTitle}>Pilot ID Card</Text>
         </View>
         <Pressable
           style={styles.helpPill}

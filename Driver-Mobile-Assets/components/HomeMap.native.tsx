@@ -79,7 +79,7 @@ function HomeMapInner() {
     : DEFAULT_REGION;
 
   return (
-    <MapView
+    <MapView userInterfaceStyle="light"
       style={StyleSheet.absoluteFillObject}
       provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
       showsUserLocation={false}

@@ -41,7 +41,7 @@ export default function RegisterScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setLoading(true);
     await register(name.trim(), `+91 ${phone}`, email.trim());
-    router.replace("/(tabs)/home");
+    router.replace("/home");
   };
 
   const fields: Field[] = [

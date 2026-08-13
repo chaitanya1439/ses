@@ -222,7 +222,7 @@ export default function ParcelRideSelectScreen() {
       {/* Map Section */}
       <View style={styles.mapContainer}>
         {Platform.OS !== "web" && pickupCoords ? (
-          <MapView style={StyleSheet.absoluteFill} initialRegion={mapRegion}>
+          <MapView userInterfaceStyle="light" style={StyleSheet.absoluteFill} initialRegion={mapRegion}>
             <Marker coordinate={pickupCoords}>
               <View style={styles.mapPopup}>
                 <View style={styles.mapPopupDurationBox}>

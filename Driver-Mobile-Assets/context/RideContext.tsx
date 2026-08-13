@@ -21,6 +21,7 @@ export interface RideRequest {
   distance: string;
   fare: number;
   type: string;
+  otp?: string;
 }
 
 export interface CompletedRide {
@@ -45,6 +46,7 @@ interface RideContextValue {
   activeRide: RideRequest | null;
   activeRideStep: ActiveRideStep;
   acceptRide: (ride: RideRequest) => void;
+  syncRide: (ride: RideRequest, step?: ActiveRideStep) => void;
   rejectRide: () => void;
   advanceRideStep: () => void;
   completeRide: () => void;
@@ -138,6 +140,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setActiveRideStep('navigate');
   }, []);
 
+  const syncRide = useCallback((ride: RideRequest, step: ActiveRideStep = 'navigate') => {
+    setActiveRide(ride);
+    setActiveRideStep(step);
+    setIsOnDuty(true);
+  }, []);
+
   const rejectRide = useCallback(() => {
     const ride = incomingRide;
     if (ride) {
@@ -186,7 +194,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     incomingRide, setIncomingRide,
     showRidePopup, setShowRidePopup,
     activeRide, activeRideStep,
-    acceptRide, rejectRide, advanceRideStep, completeRide,
+    acceptRide, syncRide, rejectRide, advanceRideStep, completeRide,
     todayEarnings, completedRides, loadRides,
   }), [
     isOnDuty,
@@ -195,6 +203,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     activeRide,
     activeRideStep,
     acceptRide,
+    syncRide,
     rejectRide,
     advanceRideStep,
     completeRide,

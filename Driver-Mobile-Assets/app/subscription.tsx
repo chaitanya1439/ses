@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Platform, Image
+  View, Text, StyleSheet, ScrollView, Pressable, Platform
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,7 +18,7 @@ interface Plan {
 }
 
 const PLANS: Plan[] = [
-  { id: 'p1', name: '₹250 Earnings', duration: '2 Days', price: 9, originalPrice: 99 },
+  { id: 'p1', name: '₹300 Earnings', duration: '2 Days', price: 9, originalPrice: 99 },
   { id: 'p2', name: '₹450 Earnings', duration: '2 Days', price: 19, originalPrice: 199 },
   { id: 'p3', name: '₹750 Earnings', duration: '2 Days', price: 29, originalPrice: 399 },
 ];
@@ -26,7 +26,6 @@ const PLANS: Plan[] = [
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<string>('p1');
-  const [subscribed, setSubscribed] = useState(false);
 
   const topPad = Platform.OS === 'web' ? insets.top + 10 : insets.top;
   const selected = PLANS.find(p => p.id === selectedPlan)!;

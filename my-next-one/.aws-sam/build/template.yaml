@@ -335,6 +335,27 @@ Resources:
         Fn::GetAtt:
         - RideGoUserPool
         - Arn
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LoginFunction
+      Handler: login.lambdaHandler
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          JWT_SECRET: my-secure-ridego-jwt-secret-key
+      Events:
+        LoginApi:
+          Type: Api
+          Properties:
+            Path: /login
+            Method: post
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: UsersTable
+    Metadata:
+      SamResourceId: LoginFunction
 Outputs:
   UsersTableName:
     Description: DynamoDB Users Table

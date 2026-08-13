@@ -7,6 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getAuth, signOut } from "@react-native-firebase/auth";
 
 interface User {
   id: string;
@@ -15,6 +16,7 @@ interface User {
   email: string;
   rating: number;
   token?: string;
+  gender?: string;
 }
 
 interface AuthContextValue {
@@ -24,6 +26,7 @@ interface AuthContextValue {
   login: (phone: string, token?: string) => Promise<void>;
   register: (name: string, phone: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (data: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -39,7 +42,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const stored = await AsyncStorage.getItem(AUTH_KEY);
         if (stored) {
-          setUser(JSON.parse(stored));
+          const parsedUser = JSON.parse(stored);
+          
+          if (parsedUser.token && !parsedUser.token.includes('dummy_token')) {
+            // Try to refresh token in background
+            try {
+              const res = await fetch("https://real.shelteric.com/auth/refresh", {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${parsedUser.token}` }
+              });
+              const data = await res.json();
+              if (res.ok && data.token) {
+                parsedUser.token = data.token;
+                await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(parsedUser));
+                console.log("Token successfully refreshed on app load");
+              }
+            } catch (e) {
+              console.log("Failed to refresh token in background", e);
+            }
+          }
+          
+          setUser(parsedUser);
         }
       } catch {
         // ignore
@@ -75,7 +98,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
   };
 
+  const updateUser = async (data: Partial<User>) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...data };
+    await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  };
+
   const logout = async () => {
+    try {
+      const auth = getAuth();
+      await signOut(auth);
+    } catch (e) {
+      console.log("Firebase sign out error", e);
+    }
     await AsyncStorage.removeItem(AUTH_KEY);
     setUser(null);
   };
@@ -88,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      updateUser,
     }),
     [user, isLoading]
   );

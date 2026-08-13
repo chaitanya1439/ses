@@ -75,7 +75,7 @@ export function useCurrentLocation() {
             });
             
             if (parts.length > 0) {
-              finalAddress = parts[0]; // Show only the primary place name
+              finalAddress = parts.join(", "); // Show the full clean address
             } else {
               finalAddress = "Current Location";
             }
@@ -101,7 +101,7 @@ export function useCurrentLocation() {
               });
               setState((prev) => ({
                 ...prev,
-                address: parts[0] || "Current Location",
+                address: parts.length > 0 ? parts.join(", ") : "Current Location",
               }));
             }
           } catch {

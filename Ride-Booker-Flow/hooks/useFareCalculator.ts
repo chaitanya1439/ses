@@ -22,10 +22,12 @@ export interface VehicleOption {
 }
 
 const VEHICLE_CONFIG = [
-  { id: "bike-saver", name: "Bike Saver", capacity: 1, baseFare: 20, perKm: 8, perMin: 0.8, icon: "motorbike", iconSet: "MaterialCommunityIcons" as const, isFastest: true },
+  { id: "bike-saver", name: "Bike Saver", capacity: 1, baseFare: 20, perKm: 8, perMin: 0.8, icon: "motorbike", iconSet: "MaterialCommunityIcons" as const, isFastest: true, useCustomImage: true },
+  { id: "auto", name: "Auto Rickshaw", capacity: 3, baseFare: 30, perKm: 12, perMin: 1.5, icon: "rickshaw", iconSet: "MaterialCommunityIcons" as const, useCustomImage: true },
   { id: "she-bike", name: "She Bike", capacity: 1, baseFare: 22, perKm: 9, perMin: 0.9, icon: "motorbike", iconSet: "MaterialCommunityIcons" as const, useCustomImage: true },
   { id: "parcel-bike", name: "Parcel Bike", capacity: 1, baseFare: 25, perKm: 10, perMin: 1, icon: "cube-outline", iconSet: "Ionicons" as const, useCustomImage: true },
-  { id: "scooty", name: "Scooty", capacity: 1, baseFare: 18, perKm: 7, perMin: 0.8, icon: "scooter", iconSet: "MaterialCommunityIcons" as const, hasDiscount: true },
+  { id: "parcel-auto", name: "Parcel Auto", capacity: 1, baseFare: 40, perKm: 15, perMin: 2, icon: "truck-fast", iconSet: "MaterialCommunityIcons" as const },
+  { id: "scooty", name: "Scooty", capacity: 1, baseFare: 18, perKm: 7, perMin: 0.8, icon: "scooter", iconSet: "MaterialCommunityIcons" as const, hasDiscount: true, useCustomImage: true },
 ];
 
 // ─── Hook ────────────────────────────────────────────────────────────

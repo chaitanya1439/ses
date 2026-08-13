@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 
-export const GOOGLE_MAPS_API_KEY = "AIzaSyBXBSZzen8-bLZ_KJURq1sHyc872ubOkDM";
+export const GOOGLE_MAPS_API_KEY = "AIzaSyCleomJ-Z8Dalf54g7ApfjzIsSP6_Z_ats";
 
 function getExpoDevHost() {
   const hostUri = Constants.expoConfig?.hostUri;

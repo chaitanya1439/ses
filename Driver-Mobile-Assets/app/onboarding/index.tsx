@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, {} from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -25,7 +25,10 @@ export default function OnboardingIndex() {
   
   const allDocsVerified = docs.every(doc => verifiedDocs[doc]);
   const isVehicleVerified = !!driver?.isVehicleVerified;
-  const allVerified = allDocsVerified && isVehicleVerified;
+  const isSelfieVerified = !!driver?.isSelfieVerified;
+  const isDetailsVerified = !!driver?.isDetailsVerified;
+  
+  const allVerified = allDocsVerified && isVehicleVerified && isSelfieVerified && isDetailsVerified;
 
   const handleFinish = () => {
     if (allVerified) {
@@ -108,6 +111,72 @@ export default function OnboardingIndex() {
 
           <View style={styles.statusBox}>
             {isVehicleVerified ? (
+              <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+            )}
+          </View>
+        </Pressable>
+
+        {/* Selfie Verification Card */}
+        <Pressable 
+          style={[styles.docCard, isSelfieVerified && styles.docCardVerified]}
+          onPress={() => {
+            if (!isSelfieVerified) {
+              router.push('/onboarding/selfie' as any);
+            }
+          }}
+        >
+          <View style={[styles.iconBox, isSelfieVerified && styles.iconBoxVerified]}>
+            <MaterialCommunityIcons 
+              name="face-recognition" 
+              size={24} 
+              color={isSelfieVerified ? theme.colors.success : theme.colors.primary} 
+            />
+          </View>
+          
+          <View style={styles.docInfo}>
+            <Text style={styles.docTitle}>Pilot Selfie</Text>
+            <Text style={styles.docDesc}>
+              {isSelfieVerified ? 'Selfie captured successfully' : 'Take a photo of yourself'}
+            </Text>
+          </View>
+
+          <View style={styles.statusBox}>
+            {isSelfieVerified ? (
+              <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+            )}
+          </View>
+        </Pressable>
+
+        {/* Additional Details Card */}
+        <Pressable 
+          style={[styles.docCard, isDetailsVerified && styles.docCardVerified]}
+          onPress={() => {
+            if (!isDetailsVerified) {
+              router.push('/onboarding/details' as any);
+            }
+          }}
+        >
+          <View style={[styles.iconBox, isDetailsVerified && styles.iconBoxVerified]}>
+            <MaterialCommunityIcons 
+              name="card-account-details-outline" 
+              size={24} 
+              color={isDetailsVerified ? theme.colors.success : theme.colors.primary} 
+            />
+          </View>
+          
+          <View style={styles.docInfo}>
+            <Text style={styles.docTitle}>Additional Details</Text>
+            <Text style={styles.docDesc}>
+              {isDetailsVerified ? 'Details submitted' : 'Fill your basic information'}
+            </Text>
+          </View>
+
+          <View style={styles.statusBox}>
+            {isDetailsVerified ? (
               <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
             ) : (
               <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />

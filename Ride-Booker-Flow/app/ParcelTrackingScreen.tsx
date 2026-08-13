@@ -152,7 +152,7 @@ export default function ParcelTrackingScreen() {
       {/* Map Section */}
       <View style={styles.mapContainer}>
         {Platform.OS !== "web" ? (
-          <MapView
+          <MapView userInterfaceStyle="light"
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={mapRegion}

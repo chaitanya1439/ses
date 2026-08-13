@@ -30,7 +30,7 @@ export default function PlansTutorialScreen() {
 
           {/* Plan Pill 1 */}
           <View style={styles.darkPill}>
-            <Text style={styles.darkPillText}>Earn ₹9/km</Text>
+            <Text style={styles.darkPillText}>Earn ₹15/km</Text>
           </View>
           
           {/* Plan Pill 2 - Highlighted */}

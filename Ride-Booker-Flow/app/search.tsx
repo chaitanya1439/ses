@@ -37,12 +37,12 @@ const MAX_RECENT = 5;
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ pickupAddress?: string; pickupLat?: string; pickupLng?: string }>();
+  const params = useLocalSearchParams<{ pickupAddress?: string; pickupLat?: string; pickupLng?: string; returnTo?: string; focus?: "pickup" | "dest" }>();
   const { setPickup, setDrop } = useBooking();
 
   const [pickupText, setPickupText] = useState(params.pickupAddress || "");
   const [destText, setDestText] = useState("");
-  const [activeField, setActiveField] = useState<"pickup" | "dest">("dest");
+  const [activeField, setActiveField] = useState<"pickup" | "dest">(params.focus === "pickup" ? "pickup" : "dest");
   const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
@@ -86,9 +86,15 @@ export default function SearchScreen() {
   }, [params.pickupAddress]);
 
   useEffect(() => {
-    const timer = setTimeout(() => destRef.current?.focus(), 400);
+    const timer = setTimeout(() => {
+      if (params.focus === "pickup") {
+        pickupRef.current?.focus();
+      } else {
+        destRef.current?.focus();
+      }
+    }, 400);
     return () => clearTimeout(timer);
-  }, []);
+  }, [params.focus]);
 
   const searchPlaces = useCallback((text: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -158,7 +164,11 @@ export default function SearchScreen() {
       if (!pickupText) {
         setPickup({ name: "Current Location", address: "Detected location", lat: pickupLat, lng: pickupLng });
       }
-      router.push("/ride-map" as any);
+      if (params.returnTo) {
+        router.back();
+      } else {
+        router.push("/ride-map" as any);
+      }
     }
   };
 
@@ -177,7 +187,11 @@ export default function SearchScreen() {
       if (!pickupText) {
         setPickup({ name: "Current Location", address: "Detected location", lat: pickupLat, lng: pickupLng });
       }
-      router.push("/ride-map" as any);
+      if (params.returnTo) {
+        router.back();
+      } else {
+        router.push("/ride-map" as any);
+      }
     }
   };
 
@@ -306,7 +320,7 @@ export default function SearchScreen() {
                 <Animated.View style={[styles.bottomOptions, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                   <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Around you</Text>
                   
-                  <Pressable style={({ pressed }) => [styles.bottomOptionRow, pressed && styles.rowPressed]} onPress={() => router.push("/confirm-pickup")}>
+                  <Pressable style={({ pressed }) => [styles.bottomOptionRow, pressed && styles.rowPressed]} onPress={() => router.push("/confirm-pickup?mode=select" as any)}>
                     <LinearGradient colors={['#F3E8FF', '#E9D5FF']} style={styles.bottomOptionIcon}>
                       <MaterialCommunityIcons name="crosshairs-gps" size={20} color="#9333EA" />
                     </LinearGradient>
@@ -317,7 +331,7 @@ export default function SearchScreen() {
                     <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
                   </Pressable>
 
-                  <Pressable style={({ pressed }) => [styles.bottomOptionRow, pressed && styles.rowPressed]}>
+                  <Pressable style={({ pressed }) => [styles.bottomOptionRow, pressed && styles.rowPressed]} onPress={() => router.push({ pathname: "/saved-places", params: { field: activeField } } as any)}>
                     <LinearGradient colors={['#FEF3C7', '#FDE68A']} style={styles.bottomOptionIcon}>
                       <Ionicons name="star" size={20} color="#D97706" />
                     </LinearGradient>

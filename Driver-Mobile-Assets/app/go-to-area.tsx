@@ -88,7 +88,7 @@ export default function GoToAreaScreen() {
       >
         {/* ─── MAP SECTION ─── */}
         <View style={[styles.mapSection, { alignItems: 'stretch', justifyContent: 'flex-start' }]}>
-          <MapView
+          <MapView userInterfaceStyle="light"
             provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFillObject}
             initialRegion={{

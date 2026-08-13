@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 
 export const DEFAULT_GOOGLE_MAPS_API_KEY =
-  'AIzaSyBXBSZzen8-bLZ_KJURq1sHyc872ubOkDM';
+  'AIzaSyCleomJ-Z8Dalf54g7ApfjzIsSP6_Z_ats';
 
 export const GOOGLE_MAPS_API_KEY =
   process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? DEFAULT_GOOGLE_MAPS_API_KEY;

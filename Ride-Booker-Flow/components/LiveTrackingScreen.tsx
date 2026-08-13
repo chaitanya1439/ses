@@ -120,7 +120,7 @@ export default function LiveTrackingScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
+      <MapView userInterfaceStyle="light"
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         // Initial Region centers directly on Hyderabad coordinates right on load

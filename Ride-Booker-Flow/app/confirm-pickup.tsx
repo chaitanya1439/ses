@@ -61,7 +61,7 @@ function SkeletonSpots() {
 export default function ConfirmPickupScreen() {
   const insets = useSafeAreaInsets();
   const { pickup, drop, setPickup, selectedVehicle, fare, routeDetails } = useBooking();
-  const params = useLocalSearchParams<{ parcelDetails?: string }>();
+  const params = useLocalSearchParams<{ parcelDetails?: string; mode?: string }>();
   const { sendMessage } = useSocket();
   const { user } = useAuth();
   const { requestRide } = useRequestRide({ 
@@ -227,9 +227,18 @@ export default function ConfirmPickupScreen() {
       lng: finalLng,
     });
 
+    if (params.mode === "select") {
+      router.back();
+      return;
+    }
+
     // 3. Prepare standard ride payload with dynamic fare
     const distanceKm = routeDetails ? (routeDetails.distanceMeters / 1000).toFixed(1) : '5.0';
     const dynamicFare = fare > 0 ? fare : 56;
+    
+    // Generate a random 4-digit PIN for the ride
+    const dynamicOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
     const ridePayload = {
       riderId: user?.id || "rider-001",
       pickupLocation: { lat: finalLat, lng: finalLng },
@@ -240,6 +249,7 @@ export default function ConfirmPickupScreen() {
       dropAddress: drop?.name || drop?.address,
       riderName: user?.name,
       distance: distanceKm,
+      otp: dynamicOtp,
       ...(params.parcelDetails ? { parcelDetails: JSON.parse(params.parcelDetails) } : {})
     };
 
@@ -249,7 +259,7 @@ export default function ConfirmPickupScreen() {
     // 5. Also send via HTTP (triggers push notifications for backgrounded drivers)
     await requestRide(ridePayload);
 
-    // 4. Navigate
+    // 6. Navigate
     router.push("/driver-search" as any);
   };
 
@@ -261,7 +271,7 @@ export default function ConfirmPickupScreen() {
       {/* ═══ MAP ═══════════════════════════════════════════════════ */}
       <View style={st.mapWrap}>
         {Platform.OS !== "web" ? (
-          <MapView
+          <MapView userInterfaceStyle="light"
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={{
@@ -344,7 +354,7 @@ export default function ConfirmPickupScreen() {
           </Pressable>
           <Pressable 
             style={st.topSearchInput}
-            onPress={() => router.push("/search" as any)}
+            onPress={() => router.push({ pathname: "/search", params: { focus: "pickup" } } as any)}
           >
             <View style={st.searchDot} />
             <Text style={st.topSearchText} numberOfLines={1}>
@@ -377,7 +387,7 @@ export default function ConfirmPickupScreen() {
               <Text style={st.sheetSubtitle} numberOfLines={1}>{reverseAddress}</Text>
             ) : null}
           </View>
-          <Pressable style={st.searchBtn} onPress={() => router.push("/search" as any)}>
+          <Pressable style={st.searchBtn} onPress={() => router.push({ pathname: "/search", params: { focus: "pickup" } } as any)}>
             <Ionicons name="search" size={20} color={Colors.dark} />
           </Pressable>
         </View>

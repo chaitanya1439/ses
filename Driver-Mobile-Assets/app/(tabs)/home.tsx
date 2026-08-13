@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Dimensions, Pressable,
+  View, Text, StyleSheet, Pressable,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useRide, generateMockRide } from '@/context/RideContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
+import { useRide } from '@/context/RideContext';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { TopNavBar } from '@/components/TopNavBar';
@@ -24,7 +24,6 @@ import { SideDrawer } from '@/components/SideDrawer';
 import { theme } from '@/constants/colors';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
-const { height: screenHeight } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -32,13 +31,37 @@ export default function HomeScreen() {
     isOnDuty, setIsOnDuty,
     setIncomingRide, setShowRidePopup,
     todayEarnings, completedRides, loadRides,
+    syncRide,
   } = useRide();
   const { driver } = useAuth();
-  const rideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showNightFare, setShowNightFare] = useState(false);
   const [showGoToZone, setShowGoToZone] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [timeLeftStr, setTimeLeftStr] = useState('');
+
+  useEffect(() => {
+    if (!driver?.subscriptionExpiryDate) return;
+    
+    const updateTime = () => {
+      const now = new Date();
+      const expiry = new Date(driver.subscriptionExpiryDate!);
+      const diff = expiry.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setTimeLeftStr('Expired');
+        return;
+      }
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      setTimeLeftStr(`${hours}h ${mins}m left`);
+    };
+    
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, [driver?.subscriptionExpiryDate]);
 
   // BottomSheet snap points
   const snapPoints = React.useMemo(() => ['30%', '85%'], []);
@@ -52,6 +75,16 @@ export default function HomeScreen() {
   usePushNotifications({
     onNotificationReceived: (data) => {
       if (data.type === 'new_ride_request') {
+        const reqType = (data.vehicleType || 'Bike').toLowerCase();
+        const driverVType = (driver?.vehicleType || 'bike').toLowerCase();
+        const isDriverAuto = driverVType.includes('auto');
+        const isRequestAuto = reqType.includes('auto');
+        
+        if (isDriverAuto !== isRequestAuto) {
+          console.log('[Push] Ignored ride request due to vehicle type mismatch');
+          return;
+        }
+
         const ride = {
           id: `R${Date.now()}`,
           customer: {
@@ -72,7 +105,8 @@ export default function HomeScreen() {
           distance: data.distance ? `${data.distance} km` : '5.0 km',
           fare: data.fare ? Number(data.fare) : 150,
           type: data.vehicleType || 'Bike',
-          riderId: data.riderId
+          riderId: data.riderId,
+          otp: data.otp || '1234'
         };
         setIncomingRide(ride as any);
         setShowRidePopup(true);
@@ -81,6 +115,13 @@ export default function HomeScreen() {
     },
     onNotificationTapped: (data) => {
       if (data.type === 'new_ride_request') {
+        const reqType = (data.vehicleType || 'Bike').toLowerCase();
+        const driverVType = (driver?.vehicleType || 'bike').toLowerCase();
+        const isDriverAuto = driverVType.includes('auto');
+        const isRequestAuto = reqType.includes('auto');
+        
+        if (isDriverAuto !== isRequestAuto) return;
+
         // If the user tapped the push notification, it means they want to accept it.
         // We should show the popup so they can see the details and accept.
         const ride = {
@@ -103,7 +144,8 @@ export default function HomeScreen() {
           distance: data.distance ? `${data.distance} km` : '5.0 km',
           fare: data.fare ? Number(data.fare) : 150,
           type: data.vehicleType || 'Bike',
-          riderId: data.riderId
+          riderId: data.riderId,
+          otp: data.otp || '1234'
         };
         setIncomingRide(ride as any);
         setShowRidePopup(true);
@@ -136,10 +178,22 @@ export default function HomeScreen() {
   }, [isOnDuty, isConnected, sendMessage]);
 
   useEffect(() => {
-    if (!isOnDuty) return;
-    
-    // Dynamically listen to actual incoming ride requests broadcast from Realtime-Server
-    const unsub = subscribe('ride_request', (data) => {
+    const unsub = subscribe('new_ride_request', (data) => {
+      if (!isOnDuty) {
+        console.log('[Home] Ignored incoming ride request because driver is offline');
+        return;
+      }
+
+      const reqType = (data.vehicle || data.vehicleType || 'Bike').toLowerCase();
+      const driverVType = (driver?.vehicleType || 'bike').toLowerCase();
+      const isDriverAuto = driverVType.includes('auto');
+      const isRequestAuto = reqType.includes('auto');
+      
+      if (isDriverAuto !== isRequestAuto) {
+        console.log('[Socket] Ignored incoming ride request due to vehicle type mismatch');
+        return;
+      }
+      
       // Extract pickup/drop coordinates
       const pickupLat = data.pickupLat || data.pickupLocation?.lat || 17.385;
       const pickupLng = data.pickupLng || data.pickupLocation?.lng || 78.4867;
@@ -181,7 +235,8 @@ export default function HomeScreen() {
         distance: distanceStr || '5.0 km',
         fare: data.fare ? Number(data.fare) : 150,
         type: data.vehicle || data.vehicleType || 'Bike',
-        riderId: data.riderId
+        riderId: data.riderId,
+        otp: data.otp || '1234'
       };
       setIncomingRide(ride as any);
       setShowRidePopup(true);
@@ -199,8 +254,38 @@ export default function HomeScreen() {
     // Restore active trip state on reconnect (server pushes sync_state on auth)
     const unsubSync = subscribe('sync_state', (data) => {
       console.log('[Socket] Synced active trip state from server:', data);
-      // If there's an active trip, navigate to the active ride screen
-      if (data.status && data.status !== 'completed' && data.status !== 'cancelled') {
+      
+      const payload = data.payload || data;
+      if (payload && payload.status && payload.status !== 'completed' && payload.status !== 'cancelled') {
+        const ride = {
+          id: `R${Date.now()}`,
+          customer: {
+            id: payload.riderId || `C${Date.now()}`,
+            name: payload.driverName || 'Rider', // Note: backend sends driverName for rider, but we need rider name. Using default.
+            rating: 4.8,
+          },
+          pickup: {
+            address: payload.pickupLocation?.address || 'Pickup Location',
+            lat: payload.pickupLocation?.lat || 17.385,
+            lng: payload.pickupLocation?.lng || 78.4867,
+          },
+          drop: {
+            address: payload.dropLocation?.address || 'Dropoff Location',
+            lat: payload.dropLocation?.lat || 17.426,
+            lng: payload.dropLocation?.lng || 78.4601,
+          },
+          distance: '5.0 km', // Default since not in sync payload
+          fare: payload.fare ? Number(payload.fare) : 150,
+          type: payload.vehicleType || 'Bike',
+          riderId: payload.riderId,
+          otp: payload.otp || '1234'
+        };
+        
+        let step = 'navigate';
+        if (payload.status === 'arrived') step = 'arrived';
+        if (payload.status === 'started') step = 'started';
+        
+        syncRide(ride as any, step as any);
         router.push('/active-ride');
       }
     });
@@ -210,13 +295,36 @@ export default function HomeScreen() {
       unsubCancelled();
       unsubSync();
     };
-  }, [isOnDuty, subscribe, setIncomingRide, setShowRidePopup]);
+  }, [isOnDuty, subscribe, setIncomingRide, setShowRidePopup, syncRide]);
 
-  const todayRides = completedRides.filter(r =>
+  const todayRides = completedRides.filter((r: any) =>
     r.status === 'completed' && new Date(r.timestamp).toDateString() === new Date().toDateString()
   ).length;
 
   const driverName = driver?.name?.split(' ')[0] || 'Driver';
+
+  const handleToggleDuty = (newStatus: boolean) => {
+    if (newStatus) {
+      const expiry = driver?.subscriptionExpiryDate;
+      const earningLimit = driver?.subscriptionEarningLimit;
+      const now = new Date();
+      
+      if (!expiry || new Date(expiry) < now) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        alert('Your subscription has expired. Please recharge to go online and receive rides.');
+        router.push('/subscription-plans' as any);
+        return;
+      }
+
+      if (earningLimit && todayEarnings >= earningLimit) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        alert(`You have reached your earning limit (₹${earningLimit}). Please upgrade your plan to continue earning.`);
+        router.push('/subscription-plans' as any);
+        return;
+      }
+    }
+    setIsOnDuty(newStatus);
+  };
 
   return (
     <View style={styles.container}>
@@ -231,7 +339,7 @@ export default function HomeScreen() {
               <Text style={styles.zoneBadgeText}>₹12/km Guaranteed Earn...</Text>
             </View>
             {/* Close map X button */}
-            <Pressable style={[styles.mapCloseBtn, { top: insets.top + 70, bottom: 'auto' }]} onPress={() => setIsOnDuty(false)}>
+            <Pressable style={[styles.mapCloseBtn, { top: insets.top + 70, bottom: 'auto' }]} onPress={() => handleToggleDuty(false)}>
               <Ionicons name="close" size={22} color={theme.colors.textMuted} />
             </Pressable>
           </View>
@@ -246,7 +354,7 @@ export default function HomeScreen() {
       <View style={styles.fixedTopBar}>
         <TopNavBar
           isOnDuty={isOnDuty}
-          onToggle={setIsOnDuty}
+          onToggle={handleToggleDuty}
           onMenuPress={() => setIsDrawerOpen(true)}
           onHeartPress={() => router.push('/go-to-area')}
           onBellPress={() => router.push('/notification')}
@@ -271,25 +379,73 @@ export default function HomeScreen() {
           />
 
           {/* === SECTION 3 — EARNING PLAN PROMO === */}
-          <Pressable 
-            style={[styles.promoCard, { marginTop: 16 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/subscription-plans' as any);
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.promoTitle}>Choose your earning plan</Text>
-              <View style={styles.promoBtn}>
-                <Text style={styles.promoBtnText}>View All Plans →</Text>
-              </View>
-            </View>
-            <View style={styles.planBadge}>
-              <Text style={styles.planBadgeSmall}>MY</Text>
-              <Text style={styles.planBadgeLarge}>PLAN</Text>
-              <Text style={styles.planBadgeRupee}>₹₹</Text>
-            </View>
-          </Pressable>
+          {(() => {
+            const expiry = driver?.subscriptionExpiryDate;
+            const earningLimit = driver?.subscriptionEarningLimit || 0;
+            const now = new Date();
+            const isActive = expiry && new Date(expiry) > now;
+            
+            if (isActive) {
+              const progressPercentage = earningLimit > 0 ? Math.min(100, (todayEarnings / earningLimit) * 100) : 0;
+              
+              return (
+                <Pressable 
+                  style={[styles.promoCard, { marginTop: 16, backgroundColor: '#1E4620', flexDirection: 'column', alignItems: 'stretch' }]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/subscription-plans' as any);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.promoTitle}>Subscription Active!</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <MaterialCommunityIcons name="clock-outline" size={14} color="#81C784" />
+                        <Text style={{ color: '#81C784', fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>
+                          {timeLeftStr}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[styles.planBadge, { backgroundColor: '#2E7D32', width: 48, height: 48 }]}>
+                      <MaterialCommunityIcons name="check-decagram" size={24} color="#FFF" />
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text style={{ color: '#FFF', fontSize: 12, fontFamily: 'Poppins_600SemiBold' }}>Today&apos;s Limit</Text>
+                      <Text style={{ color: '#FFF', fontSize: 12, fontFamily: 'Poppins_700Bold' }}>₹{todayEarnings} / ₹{earningLimit}</Text>
+                    </View>
+                    <View style={{ height: 6, backgroundColor: '#2E7D32', borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: '100%', width: `${progressPercentage}%`, backgroundColor: progressPercentage >= 100 ? '#F44336' : '#81C784', borderRadius: 3 }} />
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            }
+
+            return (
+              <Pressable 
+                style={[styles.promoCard, { marginTop: 16 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/subscription-plans' as any);
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.promoTitle}>Choose your earning plan</Text>
+                  <View style={styles.promoBtn}>
+                    <Text style={styles.promoBtnText}>View All Plans →</Text>
+                  </View>
+                </View>
+                <View style={styles.planBadge}>
+                  <Text style={styles.planBadgeSmall}>MY</Text>
+                  <Text style={styles.planBadgeLarge}>PLAN</Text>
+                  <Text style={styles.planBadgeRupee}>₹₹</Text>
+                </View>
+              </Pressable>
+            );
+          })()}
 
           {/* === SECTION 4 — QUICK ACTION ICONS ROW === */}
           <QuickActionIcons
@@ -339,6 +495,18 @@ export default function HomeScreen() {
                 <Text style={[styles.quickActionValue, { color: theme.colors.teal }]}>40%</Text>
                 <Text style={styles.quickActionLabel}>More Earnings</Text>
               </Pressable>
+
+              <Pressable
+                style={styles.quickActionCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/driver-scanner' as any);
+                }}
+              >
+                <MaterialCommunityIcons name="qrcode-scan" size={28} color={theme.colors.primary} />
+                <Text style={[styles.quickActionValue, { color: theme.colors.primary }]}>Scan QR</Text>
+                <Text style={styles.quickActionLabel}>Instant Ride</Text>
+              </Pressable>
             </View>
           </View>
         </BottomSheetScrollView>
@@ -364,6 +532,19 @@ export default function HomeScreen() {
         isVisible={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
       />
+
+      {/* QR Scanner FAB */}
+      <View style={styles.fabContainer}>
+        <Pressable 
+          style={styles.scannerFab} 
+          onPress={() => {
+            import('expo-haptics').then(Haptics => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+            router.push('/driver-scanner' as any);
+          }}
+        >
+          <MaterialCommunityIcons name="qrcode-scan" size={28} color="#FFF" />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -372,6 +553,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    zIndex: 20,
+  },
+  scannerFab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   scrollView: {
     flex: 1,

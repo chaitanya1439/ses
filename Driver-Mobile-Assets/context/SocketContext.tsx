@@ -1,10 +1,20 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { ioTClient } from '@/lib/aws-iot';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
+
+export interface Hotspot {
+  lat: number;
+  lng: number;
+  intensity: number;
+  surge: number;
+}
 
 interface SocketContextType {
   socket: any | null; // Keeping for compatibility, but it will be ioTClient
   isConnected: boolean;
+  hotspots: Hotspot[];
   sendMessage: (type: string, payload?: any) => void;
   sendThrottledMessage: (type: string, payload?: any, throttleMs?: number) => void;
   subscribe: (type: string, callback: (payload: any) => void) => () => void;
@@ -13,6 +23,7 @@ interface SocketContextType {
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   isConnected: false,
+  hotspots: [],
   sendMessage: () => {},
   sendThrottledMessage: () => {},
   subscribe: () => () => {},
@@ -20,8 +31,9 @@ const SocketContext = createContext<SocketContextType>({
 
 export const useSocket = () => useContext(SocketContext);
 
-export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider' | 'driver', userId: string, token?: string, vehicleType?: string }> = ({ children, role, userId, token, vehicleType }) => {
+export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider' | 'driver', userId: string, token?: string, vehicleType?: string, onForceLogout?: () => void }> = ({ children, role, userId, token, vehicleType, onForceLogout }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const lastDriverStatusRef = useRef<string | null>(null);
   
   // Event Emitter pattern for components to easily subscribe to specific real-time events
@@ -38,87 +50,136 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
     };
   }, []);
 
-  // Central MQTT message router
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Central message router
   const handleIncomingMessage = useCallback((message: any) => {
     try {
+      if (message.type === 'demand_heatmap') {
+        setHotspots(message.payload || []);
+      }
+      
+      if (message.type === 'force_logout') {
+        if (onForceLogout) onForceLogout();
+      }
+      
       if (message.type && listenersRef.current[message.type]) {
         listenersRef.current[message.type].forEach(cb => cb(message.payload || message));
-      } else {
-        console.log(`[IoT] Unhandled message type:`, message.type);
+      } else if (message.type !== 'demand_heatmap') {
+        console.log(`[WS] Unhandled message type:`, message.type);
       }
     } catch (e) {
-      console.error('[IoT] Failed to process message', e);
+      console.error('[WS] Failed to process message', e);
     }
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isComponentMounted = useRef(true);
 
-    const connectIoT = async () => {
-      if (!token || !userId) return;
+  const connect = useCallback(() => {
+    if (!token || !userId) return;
 
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
+      return;
+    }
+
+    const wsUrl = `wss://real.shelteric.com?token=${token}`;
+    console.log(`[WS] Connecting to Realtime-Server at ${wsUrl}...`);
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = async () => {
+      console.log(`[WS] Connected!`);
+      setIsConnected(true);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      let deviceId = 'unknown';
       try {
-        console.log(`[IoT] Connecting to AWS IoT Core for Driver ${userId}...`);
-        await ioTClient.connect(token);
-        
-        if (!isMounted) return;
-        setIsConnected(true);
-        console.log(`[IoT] Connected to AWS IoT Core!`);
-
-        // Re-send driver status on reconnect
-        if (lastDriverStatusRef.current) {
-           ioTClient.publish(`ridego/system/broadcast`, { type: 'driver_status', status: lastDriverStatusRef.current });
+        if (Platform.OS === 'android') {
+          deviceId = Application.getAndroidId();
+        } else {
+          deviceId = await Application.getIosIdForVendorAsync() || 'unknown';
         }
+      } catch (e) {
+        console.warn('Could not get device ID', e);
+      }
 
-        // Subscribe to Driver's personal inbox
-        ioTClient.subscribe(`ridego/users/${userId}/inbox`, handleIncomingMessage);
-        
-        // Subscribe to global ride requests
-        ioTClient.subscribe(`ridego/system/requests`, handleIncomingMessage);
-        
-        // Subscribe to global broadcasts
-        ioTClient.subscribe(`ridego/system/broadcast`, handleIncomingMessage);
-        
-      } catch (error) {
-        // Gracefully degrade - app continues to work, just without real-time features
-        console.warn('[IoT] Failed to connect (app will work in offline mode):', error);
-        if (isMounted) setIsConnected(false);
+      // Re-send driver status on reconnect if available
+      const statusToSet = lastDriverStatusRef.current || 'offline';
+      ws.send(JSON.stringify({ type: 'auth', role: 'driver', id: userId, vehicleType, deviceId }));
+      ws.send(JSON.stringify({ type: 'driver_status', status: statusToSet }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleIncomingMessage(data);
+      } catch (e) {
+        console.error('[WS] Failed to parse incoming data:', event.data);
       }
     };
 
-    // Wrap in setTimeout to prevent blocking app startup
-    setTimeout(() => connectIoT(), 1000);
+    ws.onclose = () => {
+      console.log(`[WS] Disconnected`);
+      setIsConnected(false);
+      wsRef.current = null;
+      
+      if (isComponentMounted.current && token && userId) {
+        console.log(`[WS] Attempting to reconnect in 3s...`);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 3000);
+      }
+    };
+
+    ws.onerror = (e) => {
+      console.error(`[WS] Error:`, e);
+    };
+  }, [token, userId, vehicleType, handleIncomingMessage]);
+
+  useEffect(() => {
+    isComponentMounted.current = true;
+    connect();
 
     return () => {
-      isMounted = false;
-      if (userId) {
-        ioTClient.unsubscribe(`ridego/users/${userId}/inbox`, handleIncomingMessage);
-        ioTClient.unsubscribe(`ridego/system/requests`, handleIncomingMessage);
-        ioTClient.unsubscribe(`ridego/system/broadcast`, handleIncomingMessage);
+      isComponentMounted.current = false;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
       }
     };
-  }, [token, userId, handleIncomingMessage]);
+  }, [connect]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+          console.log('[WS] App became active, reconnecting...');
+          connect();
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [connect]);
 
   const sendMessage = useCallback((type: string, payload: any = {}) => {
     if (type === 'driver_status' && payload.status) {
       lastDriverStatusRef.current = payload.status;
     }
 
-    const message = { type, ...payload };
-    
-    if (type === 'ride_accepted') {
-      ioTClient.publish(`ridego/users/${payload.riderId}/inbox`, message);
-    } else if (type === 'CHAT_MESSAGE') {
-      if (payload.to) {
-        ioTClient.publish(`ridego/users/${payload.to}/inbox`, message);
-      }
-    } else if (type === 'trip_status_update' || type === 'ride_cancel') {
-      // Driver publishes trip updates to the Rider's active event topic
-      if (payload.riderId) {
-        ioTClient.publish(`ridego/rides/${payload.riderId}/events`, message);
-      }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type, ...payload }));
     } else {
-      ioTClient.publish(`ridego/system/broadcast`, message);
+      console.warn(`[WS] Cannot send message '${type}', socket is not open`);
     }
   }, []);
 
@@ -132,7 +193,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
   }, [sendMessage]);
 
   return (
-    <SocketContext.Provider value={{ socket: ioTClient, isConnected, sendMessage, sendThrottledMessage, subscribe }}>
+    <SocketContext.Provider value={{ socket: wsRef.current, isConnected, hotspots, sendMessage, sendThrottledMessage, subscribe }}>
       {children}
     </SocketContext.Provider>
   );

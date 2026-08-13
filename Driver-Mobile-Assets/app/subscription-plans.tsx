@@ -11,13 +11,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
+
+// USER REFERENCE: Razorpay Key Secret (Not used by frontend SDK, but kept here as requested)
 
 const SERVICE_TYPES = [
   'Bike Boost',
   'Scooty',
-  'Scooty',
   'Bike Metro',
   'Bike',
+  'Parcel'
 ];
 
 interface Plan {
@@ -26,21 +29,59 @@ interface Plan {
   days: string;
   price: number;
   originalPrice: number;
+  type?: string;
 }
 
 const PLANS: Plan[] = [
-  { id: '1', earnings: '₹250', days: '2', price: 9, originalPrice: 299 },
-  { id: '2', earnings: '₹450', days: '2', price: 19, originalPrice: 399 },
-  { id: '3', earnings: '₹750', days: '2', price: 29, originalPrice: 499 },
+  // Bike
+  { id: '1', earnings: '₹355', days: '1', price: 10, originalPrice: 99, type: 'Bike' },
+  { id: '2', earnings: '₹750', days: '1', price: 21, originalPrice: 99, type: 'Bike' },
+  { id: '3', earnings: '₹1,300', days: '1', price: 31, originalPrice: 99, type: 'Bike' },
+  
+  // Bike Parcel
+  { id: '4', earnings: '₹1,200', days: '1', price: 27, originalPrice: 99, type: 'Bike Parcel' },
+
+  // Weekly
+  { id: '5', earnings: 'Unlimited', days: '7', price: 210, originalPrice: 499, type: 'Weekly' },
+
+  // Auto
+  { id: '6', earnings: 'Unlimited', days: '1', price: 27, originalPrice: 99, type: 'Auto' },
+
+  // Auto Parcel
+  { id: '7', earnings: '₹1,400', days: '1', price: 49, originalPrice: 99, type: 'Auto Parcel' },
 ];
 
 export default function SubscriptionPlansScreen() {
   const insets = useSafeAreaInsets();
+  const { driver, updateDriver } = useAuth();
   const { isNewDriver } = useLocalSearchParams();
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
-  const [selectedPlan, setSelectedPlan] = useState('1');
 
-  const selected = PLANS.find((p) => p.id === selectedPlan)!;
+  const vType = (driver?.vehicleType || 'bike').toLowerCase();
+  const isAuto = vType.includes('auto');
+
+  const filteredPlans = PLANS.filter(p => {
+    const planType = (p.type || '').toLowerCase();
+    if (isAuto) {
+      return planType.includes('auto');
+    } else {
+      // Hide Auto specific plans from Bike drivers
+      if (planType.includes('auto')) return false;
+      return planType.includes('bike') || planType.includes('weekly') || planType.includes('parcel');
+    }
+  });
+
+  const [selectedPlan, setSelectedPlan] = useState(filteredPlans[0]?.id);
+
+  let activePlanId = selectedPlan;
+  if (!filteredPlans.find(p => p.id === activePlanId)) {
+    activePlanId = filteredPlans[0]?.id;
+  }
+  const selected = PLANS.find((p) => p.id === activePlanId) || filteredPlans[0];
+
+  const visibleServiceTypes = isAuto 
+    ? ['Auto', 'Auto Parcel']
+    : ['Bike Boost', 'Scooty', 'Bike Metro', 'Bike', 'Parcel'];
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
@@ -84,7 +125,7 @@ export default function SubscriptionPlansScreen() {
 
         {/* Service type pills */}
         <View style={styles.servicePills}>
-          {SERVICE_TYPES.map((svc, idx) => (
+          {visibleServiceTypes.map((svc, idx) => (
             <View key={idx} style={styles.servicePill}>
               <Text style={styles.servicePillText}>{svc}</Text>
             </View>
@@ -92,12 +133,12 @@ export default function SubscriptionPlansScreen() {
         </View>
 
         {/* ─── PLAN CARDS ─── */}
-        {PLANS.map((plan) => (
+        {filteredPlans.map((plan) => (
           <Pressable
             key={plan.id}
             style={[
               styles.planCard,
-              selectedPlan === plan.id && styles.planCardActive,
+              activePlanId === plan.id && styles.planCardActive,
             ]}
             onPress={() => {
               setSelectedPlan(plan.id);
@@ -108,10 +149,10 @@ export default function SubscriptionPlansScreen() {
             <View
               style={[
                 styles.radio,
-                selectedPlan === plan.id && styles.radioActive,
+                activePlanId === plan.id && styles.radioActive,
               ]}
             >
-              {selectedPlan === plan.id && (
+              {activePlanId === plan.id && (
                 <View style={styles.radioInner} />
               )}
             </View>
@@ -120,6 +161,14 @@ export default function SubscriptionPlansScreen() {
             <View style={styles.planCol}>
               <Text style={styles.planValue}>{plan.earnings}</Text>
               <Text style={styles.planLabel}>Earnings</Text>
+            </View>
+
+            <View style={styles.planDivider} />
+
+            {/* Type */}
+            <View style={styles.planCol}>
+              <Text style={styles.planValue}>{plan.type || 'Bike'}</Text>
+              <Text style={styles.planLabel}>Type</Text>
             </View>
 
             <View style={styles.planDivider} />
@@ -144,7 +193,7 @@ export default function SubscriptionPlansScreen() {
         <Text style={styles.termsTitle}>Terms and conditions</Text>
         <View style={styles.termsList}>
           <Text style={styles.termItem}>
-            • Plan is active for Bike Boost, Scooty, Bike Metro & Bike only
+            • Plan is active for {isAuto ? 'Auto and Auto Parcel' : 'Bike Boost, Scooty, Bike Metro & Bike'} only
           </Text>
           <Text style={styles.termItem}>
             • No refunds will be given once plan is purchased
@@ -167,8 +216,34 @@ export default function SubscriptionPlansScreen() {
             { opacity: pressed ? 0.85 : 1 },
           ]}
           onPress={() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.push({ pathname: '/subscription-confirm', params: { isNewDriver } } as any);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+            setTimeout(() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+              const expiryDate = new Date();
+              expiryDate.setDate(expiryDate.getDate() + parseInt(selected.days));
+
+              const isUnlimited = selected.earnings.toLowerCase() === 'unlimited';
+              const earningLimit = isUnlimited ? 999999 : parseInt(selected.earnings.replace('₹', '').replace(',', ''));
+
+              updateDriver({
+                subscriptionPlanId: selected.id,
+                subscriptionExpiryDate: expiryDate.toISOString(),
+                subscriptionEarningLimit: earningLimit,
+                subscriptionStatus: 'active'
+              });
+
+              router.push({ 
+                pathname: '/subscription-confirm', 
+                params: { 
+                  isNewDriver,
+                  planPrice: selected.price,
+                  planEarnings: selected.earnings,
+                  planDays: selected.days
+                } 
+              } as any);
+            }, 1000);
           }}
         >
           <Text style={styles.subscribeBtnText}>Subscribe</Text>

@@ -1,20 +1,26 @@
 import React, { useState, useRef } from 'react';
-import { signUpUser, initiateLogin } from '@/lib/aws-cognito';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Animated,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import BrandLogo from '@/components/BrandLogo';
 import * as Haptics from 'expo-haptics';
 import { theme } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 
+import { getAuth, signInWithPhoneNumber } from '@react-native-firebase/auth';
+
+const API_LOGIN_URL = 'https://real.shelteric.com/auth/login';
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [confirmResult, setConfirmResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const borderAnim = useRef(new Animated.Value(0)).current;
 
@@ -31,6 +37,8 @@ export default function LoginScreen() {
     outputRange: [theme.colors.border, theme.colors.primary],
   });
 
+  const { login } = useAuth();
+
   const handleSendOTP = async () => {
     if (phone.length < 10) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -38,26 +46,55 @@ export default function LoginScreen() {
     
     const fullPhone = `+91${phone}`;
     try {
-      let response = await initiateLogin(fullPhone);
-      router.push({ pathname: '/otp', params: { phone: fullPhone, session: response.Session } });
+      const auth = getAuth();
+      const confirmation = await signInWithPhoneNumber(auth, fullPhone);
+      setConfirmResult(confirmation);
     } catch (error: any) {
-      console.error('AWS Login Error:', error);
-      if (error.name === 'UserNotFoundException') {
-        try {
-          await signUpUser(fullPhone);
-          const loginResponse = await initiateLogin(fullPhone);
-          router.push({ pathname: '/otp', params: { phone: fullPhone, session: loginResponse.Session } });
-        } catch (signUpError: any) {
-          console.error('AWS Signup Error:', signUpError);
-          // 🚨 TESTING BACKDOOR: If AWS fails, go to OTP anyway
-          alert('AWS Error, but bypassing for testing. Enter 123456 as OTP.');
-          router.push({ pathname: '/otp', params: { phone: fullPhone, session: 'dummy' } });
-        }
-      } else {
-        // 🚨 TESTING BACKDOOR: Bypassing AWS errors
-        alert('AWS Login Error: ' + error.message + ' - Bypassing for testing. Enter 123456 as OTP.');
-        router.push({ pathname: '/otp', params: { phone: fullPhone, session: 'dummy' } });
+      console.error('Send OTP Error:', error);
+      alert('Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (otp.length < 6 || !confirmResult) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setLoading(true);
+    
+    const fullPhone = `+91${phone}`;
+    try {
+      const credential = await confirmResult.confirm(otp);
+      if (!credential || !credential.user) throw new Error("Verification failed");
+      
+      const idToken = await credential.user.getIdToken();
+
+      const response = await fetch(API_LOGIN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token: idToken, role: "driver" }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to login");
       }
+
+      // Store the JWT token and login
+      await login(fullPhone, data.token);
+      
+      // Route based on user existence
+      if (data.isNewUser) {
+        router.replace('/onboarding');
+      } else {
+        router.replace('/(tabs)/home');
+      }
+    } catch (error: any) {
+      console.error('Verify OTP Error:', error);
+      alert('Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -72,8 +109,8 @@ export default function LoginScreen() {
         end={{ x: 1, y: 1 }}
       >
         <View style={[styles.topContent, { paddingTop: insets.top + 24 }]}>
-          <View style={styles.logoMini}>
-            <MaterialCommunityIcons name="steering" size={36} color={theme.colors.primary} />
+          <View style={[styles.logoMini, { backgroundColor: 'transparent', padding: 0 }]}>
+            <BrandLogo width={80} height={80} />
           </View>
           <Text style={styles.welcomeText}>Welcome back</Text>
           <Text style={styles.subText}>Sign in to continue earning</Text>
@@ -89,42 +126,76 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.sectionTitle}>Enter your phone number</Text>
-          <Text style={styles.sectionSub}>We&apos;ll send you a verification code</Text>
+          <Text style={styles.sectionTitle}>{confirmResult ? "Enter OTP" : "Enter your phone number"}</Text>
+          <Text style={styles.sectionSub}>
+            {confirmResult ? `Sent to +91 ${phone}` : "We'll send you a verification code"}
+          </Text>
 
-          <Animated.View style={[styles.inputWrapper, { borderColor }]}>
-            <View style={styles.flagBox}>
-              <Text style={styles.flag}>IN</Text>
-              <Text style={styles.dialCode}>+91</Text>
-              <View style={styles.inputDivider} />
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="98765 43210"
-              placeholderTextColor={theme.colors.textMuted}
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={phone}
-              onChangeText={setPhone}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-            />
-            {phone.length === 10 && (
-              <Ionicons name="checkmark-circle" size={22} color={theme.colors.success} />
-            )}
-          </Animated.View>
+          {!confirmResult ? (
+            <>
+              <Animated.View style={[styles.inputWrapper, { borderColor }]}>
+                <View style={styles.flagBox}>
+                  <Text style={styles.flag}>IN</Text>
+                  <Text style={styles.dialCode}>+91</Text>
+                  <View style={styles.inputDivider} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="98765 43210"
+                  placeholderTextColor={theme.colors.textMuted}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={phone}
+                  onChangeText={setPhone}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                />
+                {phone.length === 10 && (
+                  <Ionicons name="checkmark-circle" size={22} color={theme.colors.success} />
+                )}
+              </Animated.View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.sendBtn,
-              { opacity: phone.length < 10 || loading ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
-            ]}
-            onPress={handleSendOTP}
-            disabled={phone.length < 10 || loading}
-          >
-            <Text style={styles.sendBtnText}>{loading ? 'Sending...' : 'Send OTP'}</Text>
-            {!loading && <Ionicons name="arrow-forward" size={20} color={theme.colors.dark} />}
-          </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  { opacity: phone.length < 10 || loading ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+                ]}
+                onPress={handleSendOTP}
+                disabled={phone.length < 10 || loading}
+              >
+                <Text style={styles.sendBtnText}>{loading ? 'Sending...' : 'Send OTP'}</Text>
+                {!loading && <Ionicons name="arrow-forward" size={20} color={theme.colors.dark} />}
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Animated.View style={[styles.inputWrapper, { borderColor }]}>
+                <TextInput
+                  style={[styles.input, { textAlign: 'center', letterSpacing: 8, fontSize: 24 }]}
+                  placeholder="------"
+                  placeholderTextColor={theme.colors.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={otp}
+                  onChangeText={setOtp}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                />
+              </Animated.View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  { opacity: otp.length < 6 || loading ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+                ]}
+                onPress={handleVerifyOTP}
+                disabled={otp.length < 6 || loading}
+              >
+                <Text style={styles.sendBtnText}>{loading ? 'Verifying...' : 'Verify OTP'}</Text>
+                {!loading && <Ionicons name="checkmark" size={20} color={theme.colors.dark} />}
+              </Pressable>
+            </>
+          )}
 
           <View style={styles.dividerRow}>
             <View style={styles.divLine} />
@@ -132,13 +203,7 @@ export default function LoginScreen() {
             <View style={styles.divLine} />
           </View>
 
-          <Pressable
-            style={({ pressed }) => [styles.registerBtn, { opacity: pressed ? 0.7 : 1 }]}
-            onPress={() => router.push('/register')}
-          >
-            <Text style={styles.registerText}>New driver? </Text>
-            <Text style={styles.registerLink}>Register here</Text>
-          </Pressable>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

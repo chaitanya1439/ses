@@ -2,7 +2,6 @@ import 'react-native-url-polyfill/auto';
 import { Sha256 } from '@aws-crypto/sha256-js';
 import { SignatureV4 } from '@aws-sdk/signature-v4';
 import { HttpRequest } from '@aws-sdk/protocol-http';
-import { fromCognitoIdentityPool } from '@aws-sdk/credential-provider-cognito-identity';
 import Paho from 'paho-mqtt';
 
 const REGION = 'us-east-1';
@@ -20,12 +19,12 @@ export class AWSIoTClient {
 
         try {
             // 1. Get AWS Credentials via Cognito Identity Pool
-            const credentialsProvider = fromCognitoIdentityPool({
-                clientConfig: { region: REGION },
-                identityPoolId: IDENTITY_POOL_ID,
-                logins: {
-                    [`cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}`]: jwtToken
-                }
+            // Connecting with mock credentials because Cognito is removed
+            // App will fail gracefully and fall back to offline mode
+            const credentialsProvider = async () => ({
+                accessKeyId: "mock_access_key",
+                secretAccessKey: "mock_secret_key",
+                sessionToken: "mock_session_token"
             });
 
             const credentials = await credentialsProvider();

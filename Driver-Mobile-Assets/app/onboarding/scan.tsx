@@ -20,6 +20,9 @@ export default function ScanDocument() {
   const [processing, setProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<{ number: string; expiry?: string } | null>(null);
   const [editNumber, setEditNumber] = useState('');
+  const [step, setStep] = useState<'front' | 'back'>('front');
+  const [frontPhoto, setFrontPhoto] = useState<string | null>(null);
+  const [savedFrontNumber, setSavedFrontNumber] = useState('');
   
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -38,7 +41,11 @@ export default function ScanDocument() {
       if (photo) {
         setPhotoUri(photo.uri);
         if (photo.base64) {
-          processImageWithAWS(photo.base64);
+          if (type !== 'aadhaar' || step === 'front') {
+            processImageWithAWS(photo.base64);
+          } else {
+            // No extraction needed for back
+          }
         }
       }
     } catch (e) {
@@ -112,15 +119,27 @@ export default function ScanDocument() {
       return;
     }
 
+    if (type === 'aadhaar' && step === 'front') {
+      setFrontPhoto(photoUri);
+      setSavedFrontNumber(editNumber);
+      setPhotoUri(null);
+      setStep('back');
+      setExtractedData(null);
+      return;
+    }
+
+    const finalNumber = type === 'aadhaar' && step === 'back' ? savedFrontNumber : editNumber;
+
     const currentDocs = driver.verifiedDocuments || {};
     updateDriver({
       verifiedDocuments: {
         ...currentDocs,
         [type]: {
-          number: editNumber.toUpperCase(),
+          number: finalNumber.toUpperCase(),
           verifiedAt: new Date().toISOString(),
           expiry: extractedData?.expiry,
-          imageUri: photoUri,
+          imageUri: type === 'aadhaar' ? (frontPhoto || photoUri) : photoUri,
+          backUri: type === 'aadhaar' ? photoUri : undefined,
         }
       }
     });
@@ -153,7 +172,7 @@ export default function ScanDocument() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Scan {type?.toUpperCase()}</Text>
+        <Text style={styles.headerTitle}>Scan {type?.toUpperCase()} {type === 'aadhaar' ? (step === 'front' ? '(FRONT)' : '(BACK)') : ''}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -188,6 +207,30 @@ export default function ScanDocument() {
               </View>
             )}
           </View>
+
+          {!processing && !extractedData && type === 'aadhaar' && step === 'back' && (
+            <View style={styles.extractionCard}>
+              <View style={styles.successBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                <Text style={styles.successText}>Back Captured Successfully</Text>
+              </View>
+
+              <View style={styles.actionRow}>
+                <Pressable 
+                  style={styles.retakeBtn} 
+                  onPress={() => {
+                    setPhotoUri(null);
+                  }}
+                >
+                  <Text style={styles.retakeBtnText}>Retake</Text>
+                </Pressable>
+                
+                <Pressable style={styles.confirmBtn} onPress={handleConfirm}>
+                  <Text style={styles.confirmBtnText}>Confirm Back</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
 
           {!processing && extractedData && (
             <View style={styles.extractionCard}>

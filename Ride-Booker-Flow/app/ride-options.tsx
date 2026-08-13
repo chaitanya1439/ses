@@ -33,13 +33,14 @@ export default function RideOptionsScreen() {
   const { requestRide } = useRequestRide({ 
     token: user?.token ?? "" 
   });
-  const { sendThrottledMessage } = useSocket();
+  const { sendThrottledMessage, subscribe } = useSocket();
   const [upsellVisible, setUpsellVisible] = useState(false);
   const [upsellTimer, setUpsellTimer] = useState(10);
   const upsellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upsellInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const upsellOpacity = useRef(new RNAnimated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
+  const [rateCardVehicle, setRateCardVehicle] = useState<any>(null);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   const [routeDetailsLocal, setRouteDetailsLocal] = useState<{ distanceMeters: number; durationSeconds: number } | null>(null);
 
@@ -90,6 +91,9 @@ export default function RideOptionsScreen() {
       return {
         ...v,
         fare,
+        baseFare,
+        distanceCharge: Math.round(distanceKm * perKm),
+        timeCharge: Math.round(durationMin * perMin),
         dropTime,
         eta: `${etaMin} mins away`,
       };
@@ -206,37 +210,36 @@ export default function RideOptionsScreen() {
     };
   }, []);
 
-  const [dummyVehicles, setDummyVehicles] = useState<{id: string; latitude: number; longitude: number}[]>([]);
+  const [onlineVehicles, setOnlineVehicles] = useState<{id: string; latitude: number; longitude: number; type: string}[]>([]);
 
   useEffect(() => {
-    // Determine vehicle count based on type
-    const count = selectedVehicle === 'auto' ? 4 : selectedVehicle === 'car' ? 3 : 6;
-    
-    // Generate initial spots around pickup
-    const initial = Array.from({ length: count }).map((_, i) => ({
-      id: `dummy-${selectedVehicle}-${i}`,
-      latitude: pickupCoord.latitude + (Math.random() - 0.5) * 0.015,
-      longitude: pickupCoord.longitude + (Math.random() - 0.5) * 0.015,
-    }));
-    setDummyVehicles(initial);
+    // 🚀 Realtime Integration: Listen for live roaming drivers
+    const unsubNearby = subscribe('nearby_drivers', (drivers: any) => {
+      if (Array.isArray(drivers) && drivers.length > 0) {
+        setOnlineVehicles(drivers.map((d: any) => ({
+          id: d.id || d.driverId,
+          latitude: d.lat || d.latitude,
+          longitude: d.lng || d.longitude,
+          type: d.type || d.vehicleType || 'bike'
+        })));
+      } else {
+        setOnlineVehicles([]); // Empty if no drivers
+      }
+    });
 
-    // Make them slowly drift
-    const interval = setInterval(() => {
-      setDummyVehicles(prev => prev.map(v => ({
-        ...v,
-        latitude: v.latitude + (Math.random() - 0.5) * 0.0006,
-        longitude: v.longitude + (Math.random() - 0.5) * 0.0006,
-      })));
-    }, 2500);
+    return () => unsubNearby();
+  }, [subscribe]);
 
-    return () => clearInterval(interval);
-  }, [selectedVehicle, pickupCoord.latitude, pickupCoord.longitude]);
+  // Filter vehicles to show only the selected type on map
+  const visibleVehicles = useMemo(() => {
+    return onlineVehicles.filter(v => v.type.toLowerCase() === selectedVehicle.toLowerCase());
+  }, [onlineVehicles, selectedVehicle]);
 
   const renderVehicleIcon = (size = 18, color = Colors.dark) => {
-    if (selectedVehicle === "scooty") return <ScootyIcon width={size} height={size} />;
-    if (selectedVehicle === "she-bike") return <SheBikeIcon width={size} height={size} />;
-    if (selectedVehicle === "parcel") return <ParcelIcon width={size} height={size} />;
-    return <BikeIcon width={size} height={size} />;
+    if (selectedVehicle === "parcel") return <Image source={require("@/assets/images/parcel-icon.png")} style={{ width: size, height: size }} resizeMode="contain" />;
+    if (selectedVehicle === "she-bike") return <Image source={require("@/assets/images/she-bike-icon.png")} style={{ width: size, height: size }} resizeMode="contain" />;
+    if (selectedVehicle === "scooty") return <Image source={require("@/assets/images/scooty.png")} style={{ width: size, height: size }} resizeMode="contain" />;
+    return <Image source={require("@/assets/images/bike-saver.png")} style={{ width: size, height: size }} resizeMode="contain" />;
   };
 
   return (
@@ -246,7 +249,7 @@ export default function RideOptionsScreen() {
       {/* Map (40% height) */}
       <View style={styles.mapContainer}>
         {Platform.OS !== "web" ? (
-          <MapView
+          <MapView userInterfaceStyle="light"
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={{
@@ -298,8 +301,8 @@ export default function RideOptionsScreen() {
               </Pressable>
             </Marker>
 
-            {/* Drifting Real-time Vehicles */}
-            {dummyVehicles.map((v) => (
+            {/* Real-time Online Vehicles */}
+            {visibleVehicles.map((v) => (
               <Marker key={v.id} coordinate={v} zIndex={5}>
                 <View style={[styles.driverMarkerUber, { backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.dark }]}>
                   {renderVehicleIcon(20, Colors.dark)}
@@ -324,6 +327,7 @@ export default function RideOptionsScreen() {
       {/* Vehicle Options */}
       <View style={styles.optionsContainer}>
         <FlatList
+          style={{ flex: 1 }}
           data={dynamicVehicleOptions}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
@@ -333,6 +337,10 @@ export default function RideOptionsScreen() {
               isSelected={selectedVehicle === item.id}
               onSelect={() => {
                 setSelectedVehicle(item.id);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+              onInfoPress={() => {
+                setRateCardVehicle(item);
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
             />
@@ -410,6 +418,40 @@ export default function RideOptionsScreen() {
           <Text style={styles.upsellTimer}>Auto-dismiss in {upsellTimer}s</Text>
         </RNAnimated.View>
       </Modal>
+
+      {/* Rate Card Modal */}
+      <Modal visible={!!rateCardVehicle} transparent animationType="slide">
+        <Pressable style={styles.overlay} onPress={() => setRateCardVehicle(null)} />
+        <View style={[styles.upsellSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 24 }}>
+            <Text style={styles.upsellTitle}>Fare Breakdown</Text>
+            <Pressable onPress={() => setRateCardVehicle(null)}>
+              <Ionicons name="close-circle-outline" size={28} color={Colors.grey} />
+            </Pressable>
+          </View>
+          
+          <View style={{ width: '100%', gap: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.upsellSubtitle}>Base Fare</Text>
+              <Text style={{ fontSize: 16, fontFamily: "Poppins_600SemiBold", color: Colors.dark }}>₹{rateCardVehicle?.baseFare}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.upsellSubtitle}>Distance Charge</Text>
+              <Text style={{ fontSize: 16, fontFamily: "Poppins_600SemiBold", color: Colors.dark }}>₹{rateCardVehicle?.distanceCharge}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.upsellSubtitle}>Time Charge</Text>
+              <Text style={{ fontSize: 16, fontFamily: "Poppins_600SemiBold", color: Colors.dark }}>₹{rateCardVehicle?.timeCharge}</Text>
+            </View>
+            <View style={styles.upsellDash} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 18, fontFamily: "Poppins_700Bold", color: Colors.dark }}>Total Fare</Text>
+              <Text style={{ fontSize: 22, fontFamily: "Poppins_700Bold", color: Colors.dark }}>₹{rateCardVehicle?.fare}</Text>
+            </View>
+          </View>
+          <Text style={[styles.upsellTimer, { marginTop: 24 }]}>Tolls and taxes may apply extra.</Text>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -418,10 +460,12 @@ function VehicleRow({
   item,
   isSelected,
   onSelect,
+  onInfoPress,
 }: {
-  item: (typeof vehicleOptions)[0];
+  item: (typeof vehicleOptions)[0] & { baseFare?: number; distanceCharge?: number; timeCharge?: number };
   isSelected: boolean;
   onSelect: () => void;
+  onInfoPress: () => void;
 }) {
   return (
     <Pressable
@@ -430,13 +474,13 @@ function VehicleRow({
     >
       <View style={styles.vehicleIcon}>
         {item.id === "scooty" ? (
-          <ScootyIcon width={40} height={40} />
+          <Image source={require("@/assets/images/scooty.png")} style={{ width: 44, height: 44 }} resizeMode="contain" />
         ) : item.id === "she-bike" ? (
-          <SheBikeIcon width={40} height={40} />
+          <Image source={require("@/assets/images/she-bike-icon.png")} style={{ width: 44, height: 44 }} resizeMode="contain" />
         ) : item.id === "parcel" ? (
-          <ParcelIcon width={40} height={40} />
+          <Image source={require("@/assets/images/parcel-icon.png")} style={{ width: 44, height: 44 }} resizeMode="contain" />
         ) : (
-          <BikeIcon width={40} height={40} />
+          <Image source={require("@/assets/images/bike-saver.png")} style={{ width: 44, height: 44 }} resizeMode="contain" />
         )}
       </View>
       <View style={styles.vehicleInfo}>
@@ -452,7 +496,12 @@ function VehicleRow({
           {item.eta} · Drop {item.dropTime}
         </Text>
       </View>
-      <Text style={styles.vehicleFare}>₹{item.fare}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={styles.vehicleFare}>₹{item.fare}</Text>
+        <Pressable onPress={onInfoPress} style={{ padding: 4 }}>
+          <Ionicons name="information-circle-outline" size={20} color={Colors.grey} />
+        </Pressable>
+      </View>
     </Pressable>
   );
 }

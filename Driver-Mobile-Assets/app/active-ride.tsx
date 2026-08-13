@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Platform, Dimensions,
-} from 'react-native';
+  View, Text, StyleSheet, Pressable, Platform, Alert
+, TextInput, KeyboardAvoidingView } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -11,14 +11,13 @@ import { useSocket } from '@/context/SocketContext';
 import ChatModal from '@/components/ChatModal';
 import { openGoogleMapsNavigation } from '@/utils/maps';
 import { RideMap } from '@/components/RideMap';
+import SwipeButton from '@/components/SwipeButton';
 import { theme } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TextInput, KeyboardAvoidingView } from 'react-native';
 import * as Location from 'expo-location';
-import { ioTClient } from '@/lib/aws-iot';
+
 import { useAuth } from '@/context/AuthContext';
 
-const { height: screenHeight } = Dimensions.get('window');
 
 const STEP_CONFIG = {
   navigate: {
@@ -56,6 +55,7 @@ export default function ActiveRideScreen() {
   const [chatVisible, setChatVisible] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState('');
+  const [otpType, setOtpType] = useState<'pickup' | 'drop'>('pickup');
 
   const { driver } = useAuth();
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
@@ -70,7 +70,6 @@ export default function ActiveRideScreen() {
       if (!activeRide || !driver?.token) return;
 
       try {
-        await ioTClient.connect(driver.token);
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;
@@ -83,14 +82,15 @@ export default function ActiveRideScreen() {
           },
           (loc) => {
             if (activeRide) {
-              const payload = {
-                latitude: loc.coords.latitude,
-                longitude: loc.coords.longitude,
-                heading: loc.coords.heading,
-                speed: loc.coords.speed,
-                timestamp: Date.now(),
-              };
-              ioTClient.publish(`ridego/rides/${riderId}/location`, payload);
+              sendThrottledMessage('location_update', {
+                riderId,
+                location: {
+                  lat: loc.coords.latitude,
+                  lng: loc.coords.longitude,
+                  heading: loc.coords.heading,
+                  speed: loc.coords.speed,
+                }
+              }, 2000);
             }
           }
         );
@@ -106,7 +106,7 @@ export default function ActiveRideScreen() {
         locationSubscription.remove();
       }
     };
-  }, [activeRide, driver, riderId]);
+  }, [activeRide, driver, riderId, sendThrottledMessage]);
 
   if (!activeRide) {
     return (
@@ -124,6 +124,7 @@ export default function ActiveRideScreen() {
   }
 
   const { pickup, drop } = activeRide;
+  const isParcel = activeRide.type?.toLowerCase() === 'parcel' || (activeRide as any).selectedVehicle === 'parcel';
 
   const handlePrimaryAction = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -147,14 +148,28 @@ export default function ActiveRideScreen() {
   };
 
   const handleVerifyOtp = () => {
-    // In a real app, this should match the payload.otp. For now, assume 1234.
-    const expectedOtp = (activeRide as any)?.otp || "1234";
+    const expectedOtp = otpType === 'pickup' 
+      ? ((activeRide as any)?.otp || "1234") 
+      : ((activeRide as any)?.dropOtp || "5678");
+      
     if (otpInput === expectedOtp) {
       setShowOtpModal(false);
-      advanceRideStep();
-      sendThrottledMessage('trip_status_update', { riderId, status: 'started' }, 0);
+      setOtpInput('');
+      
+      if (otpType === 'pickup') {
+        advanceRideStep();
+        sendThrottledMessage('trip_status_update', { riderId, status: 'started' }, 0);
+        openGoogleMapsNavigation(drop.lat, drop.lng, drop.address);
+      } else {
+        setCompleting(true);
+        setTimeout(() => {
+          completeRide();
+          sendThrottledMessage('trip_status_update', { riderId, status: 'completed' }, 0);
+          router.replace('/(tabs)/home');
+        }, 500);
+      }
     } else {
-      setOtpError('Invalid OTP. Please ask the rider.');
+      setOtpError('Invalid OTP. Please check again.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -166,8 +181,16 @@ export default function ActiveRideScreen() {
     router.replace('/(tabs)/home');
   };
 
+  const handleSOS = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      "Emergency SOS",
+      "Emergency contacts and local authorities have been notified with your live location.",
+      [{ text: "OK", style: "cancel" }]
+    );
+  };
+
   const stepConfig = STEP_CONFIG[activeRideStep];
-  const stars = Array.from({ length: 5 }, (_, i) => i < Math.floor(activeRide.customer.rating));
   const statusLabel = activeRideStep === 'navigate' ? 'Going to Pickup' : activeRideStep === 'arrived' ? 'At Pickup' : 'Ride in Progress';
 
   return (
@@ -187,9 +210,14 @@ export default function ActiveRideScreen() {
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#111827" />
           </Pressable>
-          <View style={styles.rideStatusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: activeRideStep === 'started' ? '#10B981' : '#F59E0B' }]} />
-            <Text style={styles.statusText}>{statusLabel}</Text>
+          <View style={styles.topControlsRight}>
+            <View style={styles.rideStatusBadge}>
+              <View style={[styles.statusDot, { backgroundColor: activeRideStep === 'started' ? '#10B981' : '#F59E0B' }]} />
+              <Text style={styles.statusText}>{statusLabel}</Text>
+            </View>
+            <Pressable style={[styles.backBtn, { width: 48, height: 48, backgroundColor: '#FEE2E2', marginLeft: 8 }]} onPress={handleSOS}>
+              <Ionicons name="shield-half-outline" size={24} color="#EF4444" />
+            </Pressable>
           </View>
         </View>
       </View>
@@ -256,25 +284,50 @@ export default function ActiveRideScreen() {
 
         {/* Main Actions */}
         <View style={styles.actionContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryActionWrap,
-              { opacity: pressed || completing ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
-            ]}
-            onPress={handlePrimaryAction}
-            disabled={completing}
-          >
-            <LinearGradient 
-              colors={(stepConfig.gradient as unknown as readonly [string, string, ...string[]]) || ['#4F46E5', '#4338CA']} 
-              start={{x: 0, y: 0}} end={{x: 1, y: 1}}
-              style={styles.primaryActionBtn}
+          {activeRideStep === 'navigate' ? (
+            <SwipeButton 
+              title="Arrived on pickup"
+              onSwipeSuccess={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                advanceRideStep(); // navigate -> arrived
+                sendThrottledMessage('trip_status_update', { riderId, status: 'arrived' }, 0);
+                setOtpType('pickup');
+                setOtpInput('');
+                setShowOtpModal(true);
+              }}
+            />
+          ) : activeRideStep === 'started' && isParcel ? (
+            <SwipeButton 
+              title="Arrived on drop"
+              onSwipeSuccess={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setOtpType('drop');
+                setOtpInput('');
+                setShowOtpModal(true);
+              }}
+            />
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryActionWrap,
+                { opacity: pressed || completing ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+              ]}
+              onPress={handlePrimaryAction}
+              disabled={completing}
             >
-              <Ionicons name={stepConfig.icon as any} size={24} color="#FFF" />
-              <Text style={styles.primaryActionText}>
-                {completing ? 'Processing...' : stepConfig.label}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+              <LinearGradient 
+                colors={(stepConfig.gradient as unknown as readonly [string, string, ...string[]]) || ['#4F46E5', '#4338CA']} 
+                start={{x: 0, y: 0}} end={{x: 1, y: 1}}
+                style={styles.primaryActionBtn}
+              >
+                <Ionicons name={stepConfig.icon as any} size={24} color="#FFF" />
+                <Text style={styles.primaryActionText}>
+                  {completing ? 'Processing...' : stepConfig.label}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          )}
+
 
           <Pressable
             style={({ pressed }) => [
@@ -293,7 +346,11 @@ export default function ActiveRideScreen() {
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.otpModalContainer}>
             <Text style={styles.otpModalTitle}>Enter OTP</Text>
-            <Text style={styles.otpModalDesc}>Ask the rider for the 4-digit PIN to start the ride.</Text>
+            <Text style={styles.otpModalDesc}>
+              {otpType === 'pickup' 
+                ? 'Ask the sender for the 4-digit PIN to start.' 
+                : 'Ask the receiver for the 4-digit PIN to complete.'}
+            </Text>
             
             <TextInput
               style={styles.otpInput}
@@ -303,6 +360,32 @@ export default function ActiveRideScreen() {
               onChangeText={(text) => {
                 setOtpInput(text);
                 setOtpError('');
+                
+                // Auto verify on 4th digit
+                if (text.length === 4) {
+                  const expectedOtp = otpType === 'pickup' 
+                    ? ((activeRide as any)?.otp || "1234") 
+                    : ((activeRide as any)?.dropOtp || "5678");
+                    
+                  if (text === expectedOtp) {
+                    setShowOtpModal(false);
+                    if (otpType === 'pickup') {
+                      advanceRideStep();
+                      sendThrottledMessage('trip_status_update', { riderId, status: 'started' }, 0);
+                      openGoogleMapsNavigation(drop.lat, drop.lng, drop.address);
+                    } else {
+                      setCompleting(true);
+                      setTimeout(() => {
+                        completeRide();
+                        sendThrottledMessage('trip_status_update', { riderId, status: 'completed' }, 0);
+                        router.replace('/(tabs)/home');
+                      }, 500);
+                    }
+                  } else {
+                    setOtpError('Invalid OTP. Please check again.');
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                  }
+                }
               }}
               placeholder="0000"
               autoFocus
@@ -346,6 +429,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
+  },
+  topControlsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   rideStatusBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

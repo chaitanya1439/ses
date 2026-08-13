@@ -48,7 +48,7 @@ export default function DemandPlannerScreen() {
         <Pressable
           hitSlop={12}
           onPress={() => {
-            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
             router.back();
           }}
         >
@@ -68,7 +68,7 @@ export default function DemandPlannerScreen() {
 
       {/* ─── REAL MAP VIEW ─── */}
       <View style={[styles.mapContainer, { borderRadius: 16, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 }]}>
-        <MapView
+        <MapView userInterfaceStyle="light"
           provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFillObject}
           initialRegion={{
@@ -106,7 +106,7 @@ export default function DemandPlannerScreen() {
         <Pressable
           style={styles.myLocationBtn}
           onPress={() => {
-            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
           }}
         >
           <View style={styles.locationDot} />
@@ -122,7 +122,7 @@ export default function DemandPlannerScreen() {
             style={styles.arrowBtn}
             onPress={() => {
               if (selectedTime > 0) setSelectedTime(selectedTime - 1);
-              try { Haptics.selectionAsync(); } catch (e) {}
+              try { Haptics.selectionAsync(); } catch {}
             }}
           >
             <Ionicons name="chevron-back" size={20} color="#6B7280" />
@@ -137,7 +137,7 @@ export default function DemandPlannerScreen() {
               ]}
               onPress={() => {
                 setSelectedTime(idx);
-                try { Haptics.selectionAsync(); } catch (e) {}
+                try { Haptics.selectionAsync(); } catch {}
               }}
             >
               <Text
@@ -156,7 +156,7 @@ export default function DemandPlannerScreen() {
             onPress={() => {
               if (selectedTime < TIME_SLOTS.length - 1)
                 setSelectedTime(selectedTime + 1);
-              try { Haptics.selectionAsync(); } catch (e) {}
+              try { Haptics.selectionAsync(); } catch {}
             }}
           >
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />

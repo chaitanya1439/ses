@@ -62,13 +62,19 @@ function ProgressBar() {
 // ─── Vehicle icon ────────────────────────────────────────────────────
 function VehicleIcon({ item, size = 32 }: { item: VehicleOption; size?: number }) {
   if (item.useCustomImage) {
+    const imageSource =
+      item.id === "auto"
+        ? require("@/assets/images/auto-logo.png")
+        : item.id === "parcel-bike"
+        ? require("@/assets/images/parcel-icon.png")
+        : item.id === "bike-saver"
+        ? require("@/assets/images/bike-saver.png")
+        : item.id === "scooty"
+        ? require("@/assets/images/scooty.png")
+        : require("@/assets/images/she-bike-icon.png");
     return (
       <Image 
-        source={
-          item.id === "parcel-bike" 
-            ? require("@/assets/images/parcel-icon.png") 
-            : require("@/assets/images/she-bike-icon.png")
-        }
+        source={imageSource}
         style={{ width: size + 16, height: size + 16 }}
         resizeMode="contain"
       />
@@ -84,7 +90,7 @@ function VehicleIcon({ item, size = 32 }: { item: VehicleOption; size?: number }
 export default function RideMapScreen() {
   const insets = useSafeAreaInsets();
   const { pickup, drop, setSelectedVehicle, setFare, setRouteDetails } = useBooking();
-  const [selectedId, setSelectedId] = useState("auto");
+  const [selectedId, setSelectedId] = useState("bike-saver");
   const mapRef = useRef<MapView>(null);
 
   const pickupCoords = useMemo(() => (pickup?.lat && pickup?.lng ? { latitude: pickup.lat, longitude: pickup.lng } : null), [pickup]);
@@ -92,6 +98,18 @@ export default function RideMapScreen() {
 
   const { vehicles, directions, isLoading } = useFareCalculator(pickupCoords, destCoords);
   const selected = vehicles.find((v) => v.id === selectedId) ?? vehicles[0];
+
+  const nearbyVehicles = useMemo(() => {
+    if (!pickupCoords || !selected) return [];
+    // Generate 4-6 random markers around pickupCoords to simulate nearby vehicles
+    const count = 4 + Math.floor(Math.random() * 3);
+    return Array.from({ length: count }).map((_, i) => ({
+      id: `${selected.id}-${i}`,
+      latitude: pickupCoords.latitude + (Math.random() - 0.5) * 0.012,
+      longitude: pickupCoords.longitude + (Math.random() - 0.5) * 0.012,
+      rotation: Math.random() * 360,
+    }));
+  }, [pickupCoords, selected]);
 
   useEffect(() => {
     if (!directions?.polyline?.length || !mapRef.current) return;
@@ -120,7 +138,7 @@ export default function RideMapScreen() {
       setRouteDetails({ distanceMeters: directions.distanceMeters, durationSeconds: directions.durationSeconds });
     }
     if (selected.id === "parcel-bike" || selected.id === "parcel") {
-      router.push("/ChooseRecipientScreen" as any);
+      router.push("/review-delivery" as any);
     } else {
       router.push("/confirm-pickup");
     }
@@ -133,7 +151,7 @@ export default function RideMapScreen() {
       {/* ═══ MAP ═══════════════════════════════════════════════════ */}
       <View style={s.mapWrap}>
         {Platform.OS !== "web" ? (
-          <MapView
+          <MapView userInterfaceStyle="light"
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={{
@@ -188,6 +206,14 @@ export default function RideMapScreen() {
                 </Pressable>
               </Marker>
             )}
+
+            {nearbyVehicles.map(v => (
+              <Marker key={v.id} coordinate={v} anchor={{ x: 0.5, y: 0.5 }} style={{ zIndex: 5 }}>
+                <View style={[s.vehicleMarker, { transform: [{ rotate: `${v.rotation}deg` }] }]}>
+                  <VehicleIcon item={selected} size={20} />
+                </View>
+              </Marker>
+            ))}
           </MapView>
         ) : (
           <View style={[StyleSheet.absoluteFill, s.webPlaceholder]}>
@@ -205,7 +231,7 @@ export default function RideMapScreen() {
 
       {/* ═══ BOTTOM SHEET ═════════════════════════════════════════ */}
       <BottomSheet
-        snapPoints={["40%", "80%"]}
+        snapPoints={["50%", "90%"]}
         index={0}
         handleIndicatorStyle={{ backgroundColor: "#E5E7EB", width: 40, height: 5 }}
         backgroundStyle={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: "#000", shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 20 }}
@@ -222,7 +248,7 @@ export default function RideMapScreen() {
           <>
             <Text style={s.sheetTitle}>Choose a ride</Text>
 
-            <BottomSheetScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280, marginTop: 12 }}>
+            <BottomSheetScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 12 }}>
               {vehicles.map((v) => {
                 const isSelected = v.id === selectedId;
                 return (
@@ -309,6 +335,7 @@ const s = StyleSheet.create({
   markerPickup: { width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(79, 70, 229, 0.2)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   markerPickupInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#4F46E5" },
   markerDrop: { width: 28, height: 28, borderRadius: 8, backgroundColor: "#111827", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, borderWidth: 2, borderColor: "#FFFFFF" },
+  vehicleMarker: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: "#F3F4F6" },
   
   tooltipContainer: { alignItems: "center", paddingBottom: 6 },
   tooltipBox: { backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 6, maxWidth: 180 },

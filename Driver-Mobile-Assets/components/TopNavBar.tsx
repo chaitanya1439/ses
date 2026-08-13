@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -28,7 +28,7 @@ export function TopNavBar({
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      {/* Hamburger */}
+      {/* User Profile */}
       <Pressable
         style={styles.iconBtn}
         onPress={() => {
@@ -36,7 +36,7 @@ export function TopNavBar({
           onMenuPress?.();
         }}
       >
-        <Ionicons name="menu" size={26} color={theme.colors.text} />
+        <Image source={require('@/assets/images/driver_avatar.png')} style={{ width: 32, height: 32, borderRadius: 16 }} />
       </Pressable>
 
       {/* Duty Toggle Pill */}

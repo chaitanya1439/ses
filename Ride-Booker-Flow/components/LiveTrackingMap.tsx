@@ -144,7 +144,7 @@ export default function LiveTrackingMap() {
         <Text style={styles.etaText}>Pick-up in {etaMinutes} min</Text>
       </View>
 
-      <MapView
+      <MapView userInterfaceStyle="light"
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={{

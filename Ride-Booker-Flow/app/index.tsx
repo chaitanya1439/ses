@@ -45,7 +45,7 @@ export default function SplashScreen() {
     const timer = setTimeout(() => {
       if (!isLoading) {
         if (isAuthenticated) {
-          router.replace("/(tabs)/home");
+          router.replace("/home");
         } else {
           router.replace("/login");
         }
@@ -65,7 +65,9 @@ export default function SplashScreen() {
             <MaterialCommunityIcons name="motorbike" size={22} color={Colors.primary} />
           </View>
         </View>
-        <Text style={styles.appName}>RideGo</Text>
+        <Text style={styles.appName}>
+          M<Text style={{color: '#EF4444'}}>!</Text> tr<Text style={{color: '#F59E0B'}}>!</Text>p
+        </Text>
         <Text style={styles.tagline}>Your ride, your way</Text>
       </Animated.View>
     </View>
@@ -100,7 +102,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 40,
     fontFamily: "Poppins_700Bold",
-    color: Colors.dark,
+    color: "#2563EB",
     letterSpacing: -1,
     marginTop: 8,
   },

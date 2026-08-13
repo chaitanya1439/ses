@@ -9,7 +9,7 @@ export const BikeIcon = ({ width = 40, height = 40 }) => (
       {/* Front wheel */}
       <Rect x="18" y="4" width="4" height="8" rx="2" fill="#333333" />
       {/* Body */}
-      <Rect x="16" y="8" width="8" height="24" rx="3" fill="#F59E0B" />
+      <Rect x="16" y="8" width="8" height="24" rx="3" fill="#84CC16" />
       {/* Seat */}
       <Rect x="17" y="18" width="6" height="10" rx="2" fill="#111827" />
       {/* Handlebars */}
@@ -56,9 +56,9 @@ export const ScootyIcon = ({ width = 40, height = 40 }) => (
       {/* Front wheel */}
       <Rect x="18" y="6" width="4" height="6" rx="2" fill="#333333" />
       {/* Body floor */}
-      <Rect x="14" y="14" width="12" height="12" rx="2" fill="#3B82F6" />
+      <Rect x="14" y="14" width="12" height="12" rx="2" fill="#84CC16" />
       {/* Front panel */}
-      <Path d="M14 14 Q20 8 26 14 Z" fill="#3B82F6" />
+      <Path d="M14 14 Q20 8 26 14 Z" fill="#84CC16" />
       {/* Seat */}
       <Rect x="15" y="20" width="10" height="8" rx="3" fill="#111827" />
       {/* Handlebars */}

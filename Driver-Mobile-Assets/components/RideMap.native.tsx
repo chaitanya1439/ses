@@ -91,9 +91,9 @@ async function fetchRoute(
 
 export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
   const [driverLocation, setDriverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [driverToPickupRoute, setDriverToPickupRoute] = useState<{ latitude: number; longitude: number }[]>([]);
   const [pickupToDropRoute, setPickupToDropRoute] = useState<{ latitude: number; longitude: number }[]>([]);
   const { sendThrottledMessage } = useSocket();
+  const mapRef = React.useRef<MapView>(null);
 
   // Track driver location
   useEffect(() => {
@@ -118,11 +118,17 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
         subscription = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, distanceInterval: 10, timeInterval: 5000 },
           (loc) => {
-            setDriverLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            const newLoc = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            setDriverLocation(newLoc);
             // 🚀 Stream hardware GPS to the server during active rides
             sendThrottledMessage('location_update', {
               location: { lat: loc.coords.latitude, lng: loc.coords.longitude }
             }, 3000);
+
+            // Animate map to follow driver real-time
+            if (mapRef.current) {
+              mapRef.current.animateCamera({ center: newLoc, zoom: 16 }, { duration: 1000 });
+            }
           },
         );
       } catch (err) {
@@ -145,16 +151,6 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
     });
   }, [pickupLat, pickupLng, dropLat, dropLng]);
 
-  // Fetch driver → pickup route when driver location is available
-  useEffect(() => {
-    if (driverLocation) {
-      fetchRoute(driverLocation.latitude, driverLocation.longitude, pickupLat, pickupLng).then(points => {
-        const origin = { latitude: driverLocation.latitude, longitude: driverLocation.longitude };
-        const dest = { latitude: pickupLat, longitude: pickupLng };
-        setDriverToPickupRoute([origin, ...points, dest]);
-      });
-    }
-  }, [driverLocation, pickupLat, pickupLng]);
 
   // Calculate region to fit all points
   const allLats = [pickupLat, dropLat, ...(driverLocation ? [driverLocation.latitude] : [])];
@@ -169,7 +165,8 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
   const lngDelta = (maxLng - minLng) * 1.6 + 0.02;
 
   return (
-    <MapView
+    <MapView userInterfaceStyle="light"
+      ref={mapRef}
       style={StyleSheet.absoluteFillObject}
       provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
       initialRegion={{ latitude: midLat, longitude: midLng, latitudeDelta: latDelta, longitudeDelta: lngDelta }}
@@ -177,15 +174,6 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
       showsMyLocationButton={false}
       showsCompass={false}
     >
-      {/* Driver → Pickup route (dashed blue) */}
-      {driverToPickupRoute.length > 0 && (
-        <Polyline
-          coordinates={driverToPickupRoute}
-          strokeColor={theme.colors.darkDeep}
-          strokeWidth={4}
-          lineDashPattern={[8, 6]}
-        />
-      )}
 
       {/* Pickup → Drop route (solid primary) */}
       {pickupToDropRoute.length > 0 && (

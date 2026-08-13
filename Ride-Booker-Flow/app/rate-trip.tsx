@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, StatusBar, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, StatusBar, Image, BackHandler } from 'react-native';
 import { router } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,6 +17,15 @@ export default function RateTripScreen() {
   const [tip, setTip] = useState<number | null>(null);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   const mapRef = useRef<MapView>(null);
+
+  useEffect(() => {
+    const backAction = () => {
+      router.replace('/home');
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -50,7 +59,7 @@ export default function RateTripScreen() {
 
   const handleSubmit = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.replace('/(tabs)/home');
+    router.replace('/home');
   };
 
   return (
@@ -59,9 +68,9 @@ export default function RateTripScreen() {
       
       {/* Background Map Section */}
       <View style={styles.topSection}>
-        <MapView
+        <MapView userInterfaceStyle="light"
           ref={mapRef}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           customMapStyle={customMapStyle}
           pitchEnabled={false}
           scrollEnabled={false}
@@ -164,7 +173,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.lightGrey,
   },
   mapOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255, 255, 255, 0.2)', // Light overlay to make map subtle
   },
   startDot: {

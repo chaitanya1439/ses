@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const appJson = require('./app.json');
 
-const DEFAULT_GOOGLE_MAPS_API_KEY = 'AIzaSyBXBSZzen8-bLZ_KJURq1sHyc872ubOkDM';
+const DEFAULT_GOOGLE_MAPS_API_KEY = 'AIzaSyCleomJ-Z8Dalf54g7ApfjzIsSP6_Z_ats';
 const DEFAULT_GOOGLE_SERVICES_FILE = './google-services.json';
 
 function resolveGoogleServicesFile() {
@@ -36,8 +36,8 @@ module.exports = () => {
     extra: {
       ...expo.extra,
       eas: {
-        ...expo.extra?.eas,
         projectId: "04044752-9181-4d0d-9b58-7e3e3105b8b1",
+        ...expo.extra?.eas,
       },
     },
     android: {

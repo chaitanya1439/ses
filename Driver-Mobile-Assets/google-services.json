@@ -1,21 +1,40 @@
 {
   "project_info": {
-    "project_number": "988601448079",
-    "project_id": "fengshui-a8b39",
-    "storage_bucket": "fengshui-a8b39.firebasestorage.app"
+    "project_number": "250220049475",
+    "project_id": "mitrip-6100d",
+    "storage_bucket": "mitrip-6100d.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:988601448079:android:8e1313401cf24bae4ca2fa",
+        "mobilesdk_app_id": "1:250220049475:android:0ee4443a47162e6e8ad0f6",
         "android_client_info": {
-          "package_name": "com.ridedriver"
+          "package_name": "com.ridego"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBBjRxlFGA4zylwXqs0lkdcxT3vtnNNVKs"
+          "current_key": "AIzaSyBxau5b6uAdRO_VMqAQcjb-CKzZEwlYEmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250220049475:android:35b9289d67362d818ad0f6",
+        "android_client_info": {
+          "package_name": "com.ridepilot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxau5b6uAdRO_VMqAQcjb-CKzZEwlYEmU"
         }
       ],
       "services": {

@@ -196,7 +196,7 @@ export default function DriverSearchScreen() {
       {/* ═══ MAP ═══════════════════════════════════════════════════ */}
       <View style={st.mapWrap}>
         {Platform.OS !== "web" ? (
-          <MapView
+          <MapView userInterfaceStyle="light"
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={{

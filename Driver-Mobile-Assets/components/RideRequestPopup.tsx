@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Animated, Dimensions, Platform
+  View, Text, StyleSheet, Pressable, Animated, Dimensions, Platform, Modal, Alert
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSocket } from '@/context/SocketContext';
 import { fetchDirectionsPolyline } from '@/lib/googleMaps';
+import { useAuth } from '@/context/AuthContext';
 
 const { height } = Dimensions.get('window');
 const COUNTDOWN_SECONDS = 15;
@@ -18,6 +19,8 @@ const COUNTDOWN_SECONDS = 15;
 export function RideRequestPopup() {
   const { incomingRide, showRidePopup, acceptRide, rejectRide } = useRide();
   const { sendMessage } = useSocket();
+  const { driver } = useAuth();
+  const hasSubscription = driver?.subscriptionStatus === 'active';
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(height)).current;
   const countdownAnim = useRef(new Animated.Value(1)).current;
@@ -104,6 +107,12 @@ export function RideRequestPopup() {
   }, [incomingRide, showRidePopup]);
 
   const handleAccept = () => {
+    if (!hasSubscription) {
+      Alert.alert('Subscription Required', 'You need an active subscription to accept rides.');
+      router.push('/subscription-plans' as any);
+      return;
+    }
+
     if (timerRef.current) clearInterval(timerRef.current);
     if (countdownRef.current) countdownRef.current.stop();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -156,10 +165,11 @@ export function RideRequestPopup() {
   const stars = Array.from({ length: 5 }, (_, i) => i < Math.floor(incomingRide.customer.rating));
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999, elevation: 9999 }]}>
-      <View style={styles.modalContainer}>
-        {/* Dark overlay */}
-        <Pressable style={styles.overlay} onPress={handleReject} />
+    <Modal transparent visible={showRidePopup} animationType="none">
+      <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999, elevation: 9999 }]}>
+        <View style={styles.modalContainer}>
+          {/* Dark overlay */}
+          <Pressable style={styles.overlay} onPress={handleReject} />
 
         {/* Bottom sheet */}
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }], paddingBottom: insets.bottom + 12 }]}>
@@ -167,7 +177,7 @@ export function RideRequestPopup() {
 
           {/* Mini Map inside Request Layout */}
           <View style={styles.miniMapContainer}>
-            <MapView
+            <MapView userInterfaceStyle="light"
               ref={mapRef}
               style={StyleSheet.absoluteFillObject}
               provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
@@ -275,13 +285,23 @@ export function RideRequestPopup() {
               style={({ pressed }) => [styles.acceptBtn, { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
               onPress={handleAccept}
             >
-              <Ionicons name="checkmark" size={22} color="#FFF" />
-              <Text style={styles.acceptText}>Accept</Text>
+              {hasSubscription ? (
+                <>
+                  <Ionicons name="checkmark" size={22} color="#FFF" />
+                  <Text style={styles.acceptText}>Accept</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="card-outline" size={22} color="#FFF" />
+                  <Text style={styles.acceptText}>Get Plan</Text>
+                </>
+              )}
             </Pressable>
           </View>
         </Animated.View>
+        </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 

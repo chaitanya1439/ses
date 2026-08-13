@@ -45,7 +45,7 @@ export default function VehicleDetailsScreen() {
             { id: 'suv', name: 'SUV' }
           ]);
         }
-      } catch (err) {
+      } catch {
         setVehicleTypes([
           { id: 'bike', name: 'Bike' },
           { id: 'auto', name: 'Auto Rickshaw' },

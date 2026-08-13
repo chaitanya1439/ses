@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Platform } from 'react-native';
+import { View, StyleSheet, Animated, Platform, Text } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
@@ -49,9 +50,25 @@ export default function SplashScreen() {
           <View style={styles.glowRing} />
         </Animated.View>
 
-        <Animated.Text style={[styles.appName, { opacity: textOpacity }]}>
-          RideDriver
-        </Animated.Text>
+        <Animated.View style={{ opacity: textOpacity }}>
+          <MaskedView
+            style={{ height: 60, width: 220 }}
+            maskElement={
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={[styles.appName, { color: 'black' }]}>
+                  M! tr!p pilot
+                </Text>
+              </View>
+            }
+          >
+            <LinearGradient
+              colors={['#FF9933', '#FFFFFF', '#138808']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          </MaskedView>
+        </Animated.View>
 
         <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
           Earn More. Drive Free.
@@ -100,7 +117,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,184,0,0.1)',
   },
   appName: {
-    fontSize: 42,
+    fontSize: 40,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -0.5,

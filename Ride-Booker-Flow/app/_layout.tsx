@@ -1,7 +1,7 @@
 import "react-native-url-polyfill/auto";
 import "react-native-get-random-values";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -9,8 +9,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { BookingProvider } from "@/contexts/BookingContext";
-import { SocketProvider } from "@/contexts/SocketContext";
+import { BookingProvider, useBooking } from "@/contexts/BookingContext";
+import { SocketProvider, useSocket } from "@/contexts/SocketContext";
 import {
   useFonts,
   Poppins_400Regular,
@@ -22,6 +22,28 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
+  const { subscribe } = useSocket();
+  const { selectedVehicle } = useBooking();
+
+  useEffect(() => {
+    const unsub = subscribe("ride_accepted", (payload: any) => {
+      console.log(`[Global] ride_accepted received, navigating to ${selectedVehicle === 'parcel' ? 'parcel-confirmed' : 'booking-confirmed'}`);
+      
+      if (selectedVehicle === "parcel" || payload?.type === "parcel") {
+        router.push({
+          pathname: "/parcel-confirmed",
+          params: { payload: JSON.stringify(payload) },
+        });
+      } else {
+        router.push({
+          pathname: "/booking-confirmed",
+          params: { payload: JSON.stringify(payload) },
+        });
+      }
+    });
+    return () => unsub();
+  }, [subscribe, selectedVehicle]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
@@ -40,18 +62,27 @@ function RootLayoutNav() {
       <Stack.Screen name="review-delivery" />
       <Stack.Screen name="parcel-confirmed" />
       <Stack.Screen name="my-rides" />
+      <Stack.Screen name="instant-ride" />
     </Stack>
   );
 }
 
 function SocketWrapper({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   if (!user) return <>{children}</>;
+  
+  const handleForceLogout = async () => {
+    alert("You have been logged out because another app is active on this device.");
+    await logout();
+    router.replace('/login');
+  };
+
   return (
     <SocketProvider 
       role="rider" 
       userId={user.id} 
-      token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InJpZGVyLTAwMSIsInJvbGUiOiJyaWRlciJ9.pz5qZubhjBOCuM-BwbaImq21Hfm-4Iu_W4NF3JL2_ig"
+      token={user.token || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InJpZGVyLTAwMSIsInJvbGUiOiJyaWRlciJ9.pz5qZubhjBOCuM-BwbaImq21Hfm-4Iu_W4NF3JL2_ig"}
+      onForceLogout={handleForceLogout}
     >
       {children}
     </SocketProvider>

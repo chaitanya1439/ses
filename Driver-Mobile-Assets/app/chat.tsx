@@ -41,7 +41,7 @@ export default function DriverChatScreen() {
   if (params.rider) {
     try {
       rider = JSON.parse(params.rider as string);
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -67,48 +67,30 @@ export default function DriverChatScreen() {
 
   useEffect(() => {
     const unsub = subscribe("chat_message", (data) => {
-      // Actually listen to 'chat_message' or 'CHAT_MESSAGE' mapped in realtime server
-      if (data.from === rider.id || data.fromId === rider.id) {
+      if (data.senderId === rider.id || data.from === rider.id) {
         const textMsg = data.text || data.message;
         if (textMsg) {
           const newMsg: Message = {
             id: Date.now().toString() + Math.random().toString(),
             text: textMsg,
             from: "rider",
-            timestamp: new Date(),
+            timestamp: new Date(data.timestamp || Date.now()),
           };
           setMessages((prev) => [newMsg, ...prev]);
-          try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (e) {}
-        }
-      }
-    });
-
-    const unsubCap = subscribe("CHAT_MESSAGE", (data) => {
-      if (data.from === rider.id || data.fromId === rider.id) {
-        const textMsg = data.text || data.message;
-        if (textMsg) {
-          const newMsg: Message = {
-            id: Date.now().toString() + Math.random().toString(),
-            text: textMsg,
-            from: "rider",
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [newMsg, ...prev]);
-          try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch (e) {}
+          try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         }
       }
     });
 
     return () => {
       unsub();
-      unsubCap();
     };
   }, [subscribe, rider.id]);
 
   useEffect(() => {
     if (isConnected && messageQueue.length > 0) {
       messageQueue.forEach((msg) => {
-        sendMessage("CHAT_MESSAGE", { to: rider.id, message: msg.text });
+        sendMessage("chat_message", { recipientId: rider.id, text: msg.text });
       });
       setMessages((prev) =>
         prev.map((m) => (m.pending ? { ...m, pending: false } : m)),
@@ -132,13 +114,13 @@ export default function DriverChatScreen() {
     setShowQuickReplies(false);
 
     if (isConnected) {
-      sendMessage("CHAT_MESSAGE", { to: rider.id, message: text.trim() });
+      sendMessage("chat_message", { recipientId: rider.id, text: text.trim() });
     } else {
       setMessageQueue((prev) => [...prev, newMsg]);
     }
 
     setInputText("");
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (e) {}
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
 
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: true });

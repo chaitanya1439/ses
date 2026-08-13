@@ -7,6 +7,6 @@ architecture = "x86_64"
 handler = "app.lambdaHandler"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["DocumentVerificationFunction", "PreSignUpFunction", "DefineAuthChallengeFunction", "CreateAuthChallengeFunction", "VerifyAuthChallengeFunction"]
+functions = ["DocumentVerificationFunction", "PreSignUpFunction", "DefineAuthChallengeFunction", "CreateAuthChallengeFunction", "VerifyAuthChallengeFunction", "LoginFunction"]
 
 [layer_build_definitions]

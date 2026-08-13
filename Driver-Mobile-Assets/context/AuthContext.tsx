@@ -31,8 +31,19 @@ export interface Driver {
     verifiedAt: string;
     expiry?: string;
     imageUri: string;
+    frontUri?: string;
+    backUri?: string;
   }>;
   isVehicleVerified?: boolean;
+  alternatePhone?: string;
+  gender?: string;
+  isSelfieVerified?: boolean;
+  isDetailsVerified?: boolean;
+  hasPaidRegistrationFee?: boolean;
+  subscriptionPlanId?: string;
+  subscriptionExpiryDate?: string;
+  subscriptionEarningLimit?: number;
+  subscriptionStatus?: 'active' | 'expired' | 'none';
 }
 
 interface AuthContextValue {
@@ -62,6 +73,7 @@ const DEFAULT_DRIVER: Driver = {
   earningsThisMonth: 12450,
   isVerified: false,
   verifiedDocuments: {},
+  subscriptionStatus: 'active',
   token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmZmUxMjg2Mi04M2Q4LTQ2OGItOGM1Ni0xNDgxY2YxOGI4MTgiLCJpYXQiOjE3NjEyMTg3MjUsImV4cCI6MTc2MTgyMzUyNX0.Ny5Gt3TFZvX-mLpBdQJ8nWR0rqIbQGpXPGrcEWWNlVs'
 };
 
@@ -76,10 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           setDriver(JSON.parse(data));
         } catch {
-          setDriver(DEFAULT_DRIVER); // Auto-login for dev
+          setDriver(null); // Don't auto-login
         }
       } else {
-        setDriver(DEFAULT_DRIVER); // Auto-login for dev
+        setDriver(null); // Don't auto-login
       }
       setIsLoading(false);
     });

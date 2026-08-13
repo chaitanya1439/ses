@@ -318,3 +318,49 @@ export async function fetchNearbyPlaces(
     }
 }
 
+// --- Distance Matrix ---
+
+export interface DistanceMatrixResult {
+    durationSeconds: number;
+    durationText: string;
+    distanceMeters: number;
+    distanceText: string;
+}
+
+/**
+ * Fetches real driving duration and distance between two points
+ * using the Google Maps Distance Matrix API.
+ * Used for real-time ETA calculation from driver position to pickup/drop.
+ */
+export async function fetchDistanceMatrix(
+    origin: LatLng,
+    destination: LatLng,
+): Promise<DistanceMatrixResult | null> {
+    try {
+        const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
+        url.searchParams.set("origins", `${origin.latitude},${origin.longitude}`);
+        url.searchParams.set("destinations", `${destination.latitude},${destination.longitude}`);
+        url.searchParams.set("mode", "driving");
+        url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+
+        const response = await fetch(url.toString());
+        if (!response.ok) return null;
+        const data = await response.json();
+
+        if (data.status !== "OK" || !data.rows?.length) return null;
+
+        const element = data.rows[0].elements[0];
+        if (element.status !== "OK") return null;
+
+        return {
+            durationSeconds: element.duration.value,
+            durationText: element.duration.text,
+            distanceMeters: element.distance.value,
+            distanceText: element.distance.text,
+        };
+    } catch (error) {
+        console.warn("Distance Matrix error:", error);
+        return null;
+    }
+}
+

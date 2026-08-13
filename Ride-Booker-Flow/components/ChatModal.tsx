@@ -31,11 +31,11 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
   const quickReplies = ['On my way!', 'Wait 2 min', 'I\'m here', 'Where are you?'];
 
   useEffect(() => {
-    const unsubscribe = subscribe('CHAT_MESSAGE', (payload) => {
-      if (payload.from === targetId || payload.fromId === targetId) {
+    const unsubscribe = subscribe('chat_message', (payload) => {
+      if (payload.senderId === targetId || payload.from === targetId) {
         setMessages(prev => [...prev, {
           id: Math.random().toString(),
-          text: payload.message || payload.text,
+          text: payload.text || payload.message,
           fromMe: false,
           timestamp: new Date(payload.timestamp || Date.now())
         }]);
@@ -50,7 +50,7 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
     const msgText = (text || inputText).trim();
     if (!msgText) return;
     
-    sendMessage('CHAT_MESSAGE', { to: targetId, message: msgText });
+    sendMessage('chat_message', { recipientId: targetId, text: msgText });
     
     setMessages(prev => [...prev, {
       id: Math.random().toString(),

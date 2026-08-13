@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
 import { useBooking } from "@/contexts/BookingContext";
+import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { recentLocations, savedRiders } from "@/constants/mockData";
 import {
   fetchPlaceAutocomplete,
@@ -28,7 +29,8 @@ export default function BookRideScreen() {
   const insets = useSafeAreaInsets();
   const { pickup, drop, setPickup, setDrop, bookingFor, setBookingFor } =
     useBooking();
-  const [pickupText, setPickupText] = useState(pickup?.name ?? "");
+  const location = useCurrentLocation();
+  const [pickupText, setPickupText] = useState(pickup?.name ?? location?.address ?? "");
   const [dropText, setDropText] = useState(drop?.name ?? "");
   const [activeField, setActiveField] = useState<"pickup" | "drop">("drop");
   const [riderSheetVisible, setRiderSheetVisible] = useState(false);
@@ -123,11 +125,12 @@ export default function BookRideScreen() {
 
       // Auto-set pickup if empty
       if (!pickup && !pickupText) {
+        const address = location?.address || "Current Location";
         setPickup({
-          name: "Current Location",
-          address: "Tirumala Enclave, Alwal, Hyderabad",
+          name: address,
+          address: "Current Location",
         });
-        setPickupText("Current Location");
+        setPickupText(address);
       }
       router.push("/confirm-pickup");
     }
@@ -148,11 +151,12 @@ export default function BookRideScreen() {
       setDrop({ name: loc.name, address: loc.address });
       setDropText(loc.name);
       if (!pickup && !pickupText) {
+        const address = location?.address || "Current Location";
         setPickup({
-          name: "Current Location",
-          address: "Tirumala Enclave, Alwal, Hyderabad",
+          name: address,
+          address: "Current Location",
         });
-        setPickupText("Current Location");
+        setPickupText(address);
       }
       router.push("/confirm-pickup");
     }

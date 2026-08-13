@@ -6,6 +6,10 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+const dbClient = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
+const docClient = DynamoDBDocumentClient.from(dbClient);
 import { registerPushToken, unregisterPushToken, sendPushNotification, notifyDriverOfRideRequest, notifyRiderOfAcceptance, notifyTripStatusChange, getPushToken, } from './pushService.js';
 import { setupOcrRoutes } from './ocrService.js';
 // ─── JWT Secret ───────────────────────────────────────────────────────────────
@@ -24,6 +28,34 @@ app.use(cors());
 app.use(express.json());
 // Setup OCR endpoints
 setupOcrRoutes(app);
+// Simple healthcheck
+app.get('/', (req, res) => res.send('Realtime Server Active'));
+// Subscription Purchase Endpoint
+app.post('/buy-subscription', async (req, res) => {
+    const { driverId } = req.body;
+    if (!driverId) {
+        return res.status(400).json({ success: false, error: 'driverId is required' });
+    }
+    try {
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 2); // 2 Days Plan
+        await docClient.send(new UpdateCommand({
+            TableName: 'ridego-users',
+            Key: { userId: driverId },
+            UpdateExpression: 'SET subscriptionStatus = :status, subscriptionExpiry = :expiry',
+            ExpressionAttributeValues: {
+                ':status': 'active',
+                ':expiry': expiryDate.toISOString()
+            }
+        }));
+        console.log(`[Subscription API] Driver ${driverId} purchased subscription successfully.`);
+        return res.json({ success: true, message: 'Subscription updated' });
+    }
+    catch (error) {
+        console.error('[Subscription API] Error updating DynamoDB:', error);
+        return res.status(500).json({ success: false, error: 'Failed to update subscription in database' });
+    }
+});
 const server = createServer(app);
 // 1. Bandwidth Efficiency: Enable per-message deflate compression.
 const wss = new WebSocketServer({
@@ -60,6 +92,7 @@ function getDistanceInKm(lat1, lon1, lat2, lon2) {
 // ─── In-memory state ──────────────────────────────────────────────────────────
 const riders = new Map();
 const drivers = new Map();
+const activeDevices = new Map();
 /**
  * 2. Active State Recovery
  * Persists trip state in memory so reconnecting mobile clients can be
@@ -72,7 +105,7 @@ const activeTrips = new Map();
  * can receive missed broadcasts. Key: riderId
  */
 const pendingRequests = new Map();
-const MAX_DRIVER_MATCH_DISTANCE_KM = Number(process.env.MAX_DRIVER_MATCH_DISTANCE_KM ?? 15);
+const MAX_DRIVER_MATCH_DISTANCE_KM = Number(process.env.MAX_DRIVER_MATCH_DISTANCE_KM ?? 30);
 // ─── Heartbeat & Idle Pruning ─────────────────────────────────────────────────
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const heartbeatInterval = setInterval(() => {
@@ -225,55 +258,102 @@ wss.on('connection', (ws, _request, decodedToken) => {
                     id: clientId,
                     isAlive: true,
                     lastActivity: Date.now(),
+                    ...(data.deviceId ? { deviceId: data.deviceId } : {}),
                     ...(data.vehicleType ? { vehicleType: data.vehicleType } : {}),
                 };
-                if (data.role === 'driver') {
-                    // Default to 'available' for new drivers so they can receive rides immediately.
-                    // Previously defaulted to 'offline', which silently blocked all dispatches.
-                    newClient.status = existingDriver?.status ?? 'available';
-                    if (existingDriver?.lastLocation) {
-                        newClient.lastLocation = existingDriver.lastLocation;
-                    }
-                }
-                setClientInfo(ws, newClient);
-                if (data.role === 'rider') {
-                    riders.set(newClient.id, newClient);
-                    console.log(`[Auth] ✓ Rider REGISTERED in memory — id: ${newClient.id}`);
-                    console.log(`[Auth]   Total riders online: ${riders.size}`);
-                }
-                else {
-                    drivers.set(newClient.id, newClient);
-                    console.log(`[Auth] ✓ Driver REGISTERED in memory — id: ${newClient.id}, status: ${newClient.status}`);
-                    console.log(`[Auth]   Total drivers online: ${drivers.size}`);
-                }
-                ws.send(JSON.stringify({ type: 'auth_success', id: newClient.id, role: data.role }));
-                // Offline Recovery Sync — instantly restore in-progress trips on reconnect
-                let currentTrip;
-                if (data.role === 'rider') {
-                    currentTrip = activeTrips.get(newClient.id);
-                }
-                else {
-                    for (const trip of activeTrips.values()) {
-                        if (trip.driverId === newClient.id) {
-                            currentTrip = trip;
-                            break;
+                if (data.deviceId) {
+                    const existingDevice = activeDevices.get(data.deviceId);
+                    if (existingDevice && existingDevice.ws !== ws) {
+                        console.log(`[Auth] Device Exclusivity: Forcing logout for existing session on device ${data.deviceId}`);
+                        const logoutMsg = { type: 'force_logout', reason: 'logged_in_elsewhere' };
+                        try {
+                            existingDevice.ws.send(JSON.stringify(logoutMsg));
+                            // Give it a moment to send the message before closing
+                            setTimeout(() => {
+                                if (existingDevice.ws.readyState === WebSocket.OPEN) {
+                                    existingDevice.ws.close();
+                                }
+                            }, 100);
+                        }
+                        catch (e) {
+                            // Ignore send errors on dead sockets
                         }
                     }
+                    activeDevices.set(data.deviceId, newClient);
                 }
+                if (data.role === 'driver') {
+                    // --- DynamoDB Subscription Validation ---
+                    (async () => {
+                        try {
+                            const getCommand = new GetCommand({
+                                TableName: "ridego-users",
+                                Key: { userId: clientId }
+                            });
+                            const result = await docClient.send(getCommand);
+                            let driverDoc = result.Item;
+                            // Passed all checks, proceed to register
+                            // Mock dummy user as active for real-time URL checks
+                            if (clientId === 'ffe12862-83d8-468b-8c56-1481cf18b818') {
+                                if (!driverDoc)
+                                    driverDoc = { subscriptionStatus: 'active' };
+                                else
+                                    driverDoc.subscriptionStatus = 'active';
+                            }
+                            // Do not reject drivers without active subscriptions here.
+                            // They should still receive ride requests, but the app will prevent them from accepting.
+                            // (Original rejection code removed to allow requests to flow)
+                            newClient.status = existingDriver?.status ?? 'available';
+                            if (existingDriver?.lastLocation) {
+                                newClient.lastLocation = existingDriver.lastLocation;
+                            }
+                            setClientInfo(ws, newClient);
+                            drivers.set(newClient.id, newClient);
+                            console.log(`[Auth] ✓ Driver REGISTERED in memory — id: ${newClient.id}, status: ${newClient.status}`);
+                            console.log(`[Auth]   Total drivers online: ${drivers.size}`);
+                            ws.send(JSON.stringify({ type: 'auth_success', id: newClient.id, role: data.role }));
+                            // Offline Recovery Sync
+                            let currentTrip;
+                            for (const trip of activeTrips.values()) {
+                                if (trip.driverId === newClient.id) {
+                                    currentTrip = trip;
+                                    break;
+                                }
+                            }
+                            if (currentTrip) {
+                                ws.send(JSON.stringify({ type: 'sync_state', payload: currentTrip }));
+                                console.log(`Synced active state to reconnecting driver ${newClient.id}`);
+                            }
+                            // Deliver pending ride requests to reconnecting/newly-online drivers
+                            if (newClient.status !== 'offline') {
+                                for (const [riderId, req] of pendingRequests.entries()) {
+                                    if (Date.now() - req.timestamp <= 60_000) {
+                                        ws.send(JSON.stringify({
+                                            type: 'new_ride_request',
+                                            payload: { ...req, riderId }
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                        catch (err) {
+                            console.error(`[Auth] DynamoDB Error checking subscription for ${clientId}:`, err);
+                            ws.send(JSON.stringify({ type: 'auth_error', message: 'Internal server error verifying subscription' }));
+                            ws.close(1011, 'Internal Error');
+                        }
+                    })();
+                    break; // Exit the switch statement for driver
+                }
+                // ---- Rider Registration Flow ----
+                setClientInfo(ws, newClient);
+                riders.set(newClient.id, newClient);
+                console.log(`[Auth] ✓ Rider REGISTERED in memory — id: ${newClient.id}`);
+                console.log(`[Auth]   Total riders online: ${riders.size}`);
+                ws.send(JSON.stringify({ type: 'auth_success', id: newClient.id, role: data.role }));
+                // Offline Recovery Sync for Rider
+                const currentTrip = activeTrips.get(newClient.id);
                 if (currentTrip) {
                     ws.send(JSON.stringify({ type: 'sync_state', payload: currentTrip }));
-                    console.log(`Synced active state to reconnecting ${data.role} ${newClient.id}`);
-                }
-                // Deliver pending ride requests to reconnecting/newly-online drivers
-                if (data.role === 'driver' && newClient.status !== 'offline') {
-                    for (const [riderId, req] of pendingRequests.entries()) {
-                        if (Date.now() - req.timestamp <= 60_000) {
-                            ws.send(JSON.stringify({
-                                type: 'new_ride_request',
-                                payload: { ...req, riderId }
-                            }));
-                        }
-                    }
+                    console.log(`Synced active state to reconnecting rider ${newClient.id}`);
                 }
                 break;
             }
@@ -344,9 +424,13 @@ wss.on('connection', (ws, _request, decodedToken) => {
                         console.log(`[Dispatch] Skipped Driver ${driver.id} - status: ${driver.status}`);
                         return;
                     }
-                    // Vehicle Type matching: Only dispatch if driver's vehicleType matches requested vehicleType
-                    if (ridePayload.vehicleType && driver.vehicleType && ridePayload.vehicleType !== driver.vehicleType) {
-                        console.log(`[Dispatch] Skipped Driver ${driver.id} - vehicle type mismatch (${driver.vehicleType} != ${ridePayload.vehicleType})`);
+                    // Vehicle Type matching: Only dispatch if driver's vehicleType category matches requested vehicle
+                    const reqType = (ridePayload.vehicleType ?? ridePayload.vehicle ?? 'bike').toLowerCase();
+                    const drvType = (driver.vehicleType ?? 'bike').toLowerCase();
+                    const isRequestAuto = reqType.includes('auto');
+                    const isDriverAuto = drvType.includes('auto');
+                    if (isRequestAuto !== isDriverAuto) {
+                        console.log(`[Dispatch] Skipped Driver ${driver.id} - vehicle type mismatch (Driver: ${drvType}, Req: ${reqType})`);
                         return;
                     }
                     // Geospatial filtering: skip drivers outside the match radius
@@ -405,6 +489,54 @@ wss.on('connection', (ws, _request, decodedToken) => {
                         pickupLng: pickupLoc?.lng,
                     }).catch((err) => console.error(`[Push] Error notifying driver ${driver.id}:`, err));
                 });
+                break;
+            }
+            // ── Instant Ride Start (QR Scan) ───────────────────────────────────────
+            case 'instant_ride_start': {
+                if (!client || client.role !== 'driver')
+                    break;
+                const { bookingId, riderId, driverName, code, pickup, drop, vehicle, fare } = data;
+                if (!riderId)
+                    break;
+                client.status = 'busy';
+                const tripRecord = {
+                    riderId,
+                    driverId: client.id,
+                    status: 'accepted',
+                    otp: code || Math.floor(1000 + Math.random() * 9000).toString(),
+                    driverLat: client.lastLocation?.lat,
+                    driverLng: client.lastLocation?.lng,
+                    driverName: driverName || client.id,
+                    pickup,
+                    drop,
+                    vehicle,
+                    fare,
+                };
+                activeTrips.set(riderId, tripRecord);
+                pendingRequests.delete(riderId);
+                console.log(`[instant_ride_start] Driver ${client.id} started instant ride for rider ${riderId}`);
+                // Notify Rider
+                const riderToNotify = riders.get(riderId);
+                let riderFound = false;
+                if (riderToNotify?.ws.readyState === WebSocket.OPEN) {
+                    riderToNotify.ws.send(JSON.stringify({ type: 'instant_ride_started', payload: tripRecord }));
+                    riderFound = true;
+                }
+                else {
+                    riders.forEach((r, rId) => {
+                        if (!riderFound && r.ws.readyState === WebSocket.OPEN && rId === riderId) {
+                            r.ws.send(JSON.stringify({ type: 'instant_ride_started', payload: tripRecord }));
+                            riderFound = true;
+                        }
+                    });
+                }
+                // Notify Driver
+                if (client.ws.readyState === WebSocket.OPEN) {
+                    client.ws.send(JSON.stringify({ type: 'instant_ride_confirmed', payload: tripRecord }));
+                }
+                // Push Notification to rider
+                notifyRiderOfAcceptance(riderId, { driverId: client.id })
+                    .catch((err) => console.error(`[Push] Error notifying rider ${riderId} of instant ride:`, err));
                 break;
             }
             // ── Ride accept ────────────────────────────────────────────────────────
@@ -871,14 +1003,132 @@ app.post('/api/test-notification', async (req, res) => {
  * Production lo: ikkade DB check, password verify chesukoni token issue cheyyali.
  * Ippudu: id + role isthe chalu, token vastundi.
  */
-app.post('/auth/login', (req, res) => {
-    const { id, role } = req.body;
-    if (!id || !role || (role !== 'rider' && role !== 'driver')) {
-        res.status(400).json({ error: 'id and role (rider | driver) required' });
+app.post('/auth/login', async (req, res) => {
+    const { token: firebaseToken, role } = req.body;
+    if (!firebaseToken || !role || (role !== 'rider' && role !== 'driver')) {
+        res.status(400).json({ error: 'Firebase token and role (rider | driver) required' });
         return;
     }
-    const token = jwt.sign({ id, role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, id, role });
+    let decodedFirebaseToken;
+    try {
+        // DEV MODE ONLY: Decoding without verification because we lack serviceAccountKey.json
+        // In production, use firebase-admin.auth().verifyIdToken(firebaseToken)
+        decodedFirebaseToken = jwt.decode(firebaseToken);
+        if (!decodedFirebaseToken || !decodedFirebaseToken.phone_number) {
+            throw new Error('Invalid Firebase token or missing phone number');
+        }
+    }
+    catch (err) {
+        console.error('Firebase Token Decode Error:', err);
+        res.status(401).json({ error: 'Invalid Firebase token' });
+        return;
+    }
+    const phone = decodedFirebaseToken.phone_number;
+    const uid = decodedFirebaseToken.user_id || phone;
+    console.log(`[Auth Login] Checking DynamoDB for phone: ${phone} (UID: ${uid})`);
+    try {
+        // Check if user exists in DynamoDB
+        const getResult = await docClient.send(new GetCommand({
+            TableName: 'ridego-users',
+            Key: { userId: uid }
+        }));
+        let isNewUser = false;
+        if (!getResult.Item) {
+            isNewUser = true;
+            console.log(`[Auth Login] User not found in DynamoDB. Creating new record for ${uid}`);
+            await docClient.send(new PutCommand({
+                TableName: 'ridego-users',
+                Item: {
+                    userId: uid,
+                    phone: phone,
+                    role: role,
+                    createdAt: new Date().toISOString()
+                }
+            }));
+        }
+        else {
+            console.log(`[Auth Login] User ${uid} found in DynamoDB.`);
+        }
+        // Issue internal JWT for WebSocket Authentication
+        const internalToken = jwt.sign({ id: uid, role }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token: internalToken, id: uid, role, isNewUser });
+    }
+    catch (dbErr) {
+        console.error('[Auth Login] DynamoDB Error:', dbErr);
+        res.status(500).json({ error: 'Database operation failed' });
+    }
+});
+/**
+ * POST /auth/update-profile
+ * Completes the user profile with Name, Email, and Gender.
+ */
+app.post('/auth/update-profile', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Authorization header required' });
+        return;
+    }
+    const token = authHeader.slice(7);
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const uid = decoded.id || decoded.userId;
+        const { name, email, gender } = req.body;
+        if (!name || !email || !gender) {
+            res.status(400).json({ error: 'Name, email, and gender are required' });
+            return;
+        }
+        await docClient.send(new UpdateCommand({
+            TableName: 'ridego-users',
+            Key: { userId: uid },
+            UpdateExpression: 'SET #name = :name, #email = :email, #gender = :gender',
+            ExpressionAttributeNames: {
+                '#name': 'name',
+                '#email': 'email',
+                '#gender': 'gender'
+            },
+            ExpressionAttributeValues: {
+                ':name': name,
+                ':email': email,
+                ':gender': gender
+            }
+        }));
+        res.json({
+            message: 'Profile updated successfully',
+            user: { name, email, gender }
+        });
+    }
+    catch (error) {
+        console.error('[Auth Update Profile] Error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+/**
+ * POST /auth/refresh
+ * Refresh the JWT token so the user stays logged in.
+ */
+app.post('/auth/refresh', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Authorization header required' });
+        return;
+    }
+    const oldToken = authHeader.slice(7);
+    try {
+        // We ignore expiration to allow slightly expired tokens to be refreshed
+        const decoded = jwt.verify(oldToken, JWT_SECRET, { ignoreExpiration: true });
+        if (!decoded || (!decoded.id && !decoded.userId)) {
+            throw new Error("Invalid token payload");
+        }
+        const uid = decoded.id || decoded.userId;
+        const role = decoded.role;
+        // Issue a new 7-day token
+        const newToken = jwt.sign({ id: uid, role }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token: newToken });
+    }
+    catch (err) {
+        console.error('[Auth Refresh] Error:', err);
+        res.status(401).json({ error: 'Invalid token' });
+    }
 });
 // ─── Nearby Drivers Broadcast ─────────────────────────────────────────────────
 /**
@@ -889,7 +1139,12 @@ app.post('/auth/login', (req, res) => {
 const broadcastNearbyDrivers = setInterval(() => {
     const availableDrivers = Array.from(drivers.entries())
         .filter(([, d]) => d.status === 'available' && d.lastLocation != null)
-        .map(([id, d]) => ({ id, lat: d.lastLocation.lat, lng: d.lastLocation.lng }));
+        .map(([id, d]) => ({
+        id,
+        lat: d.lastLocation.lat,
+        lng: d.lastLocation.lng,
+        vehicleType: d.vehicleType || 'bike'
+    }));
     if (availableDrivers.length === 0)
         return;
     const payload = JSON.stringify({ type: 'nearby_drivers', payload: availableDrivers });

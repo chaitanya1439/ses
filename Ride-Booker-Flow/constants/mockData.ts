@@ -30,6 +30,7 @@ export const vehicleOptions = [
     fare: 48,
     iconName: "motorbike" as const,
     iconSet: "MaterialCommunityIcons" as const,
+    useCustomImage: true,
   },
   {
     id: "scooty",
@@ -41,6 +42,7 @@ export const vehicleOptions = [
     fare: 56,
     iconName: "scooter" as const,
     iconSet: "MaterialCommunityIcons" as const,
+    useCustomImage: true,
   },
   {
     id: "she-bike",

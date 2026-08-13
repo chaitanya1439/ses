@@ -21,7 +21,7 @@ export default function ChooseRecipientScreen() {
   const insets = useSafeAreaInsets();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [searchText, setSearchText] = useState("");
-  const [contacts, setContacts] = useState<Contacts.Contact[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
 
   // Manual entry states for fallback
   const [manualName, setManualName] = useState("");
@@ -65,7 +65,7 @@ export default function ChooseRecipientScreen() {
     }
   };
 
-  const handleSelectContact = (contact: Contacts.Contact) => {
+  const handleSelectContact = (contact: any) => {
     const phone = contact.phoneNumbers?.[0]?.number;
     if (!phone) return; // Disallow selecting invalid contacts
 
@@ -190,7 +190,7 @@ export default function ChooseRecipientScreen() {
         data={contacts}
         keyExtractor={(item, index) => (item as any).id || `contact-${index}`}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => {
+        renderItem={({ item }: { item: any }) => {
           const hasPhone = item.phoneNumbers && item.phoneNumbers.length > 0;
           return (
             <Pressable

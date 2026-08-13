@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ioTClient } from "@/lib/aws-iot";
+
 import { useAuth } from "@/contexts/AuthContext";
 import {
   View,
@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
   Animated as RNAnimated,
+  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -22,32 +23,17 @@ import { useSocket } from "@/contexts/SocketContext";
 import ChatModal from "@/components/ChatModal";
 import ShareTripModal from "@/components/ShareTripModal";
 import { mockDriver, vehicleOptions } from "@/constants/mockData";
-import { fetchDirectionsPolyline } from "@/lib/googleMaps";
+import { fetchDirectionsPolyline, fetchDistanceMatrix } from "@/lib/googleMaps";
 import { customMapStyle } from "@/constants/mapStyle";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { BikeIcon, AutoIcon, ScootyIcon, SheBikeIcon, ParcelIcon } from "@/components/VehicleIcons";
+import { LinearGradient } from 'expo-linear-gradient';
+import { AutoIcon, ScootyIcon, SheBikeIcon, ParcelIcon } from "@/components/VehicleIcons";
+
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_STEPS = ["Driver arriving", "Ride started", "Reached destination"];
-const ANIMATION_SPEED = 0.008; // 0–1 progress per frame between two coords
-const CAMERA_UPDATE_INTERVAL = 10; // update camera every N frames
-
-// ─── Dummy route (Hyderabad) for instant testing without Directions API ──────
-const DUMMY_ROUTE: { latitude: number; longitude: number }[] = [
-  { latitude: 17.3800, longitude: 78.4867 },
-  { latitude: 17.3812, longitude: 78.4870 },
-  { latitude: 17.3825, longitude: 78.4875 },
-  { latitude: 17.3838, longitude: 78.4880 },
-  { latitude: 17.3845, longitude: 78.4890 },
-  { latitude: 17.3850, longitude: 78.4878 },
-  { latitude: 17.3855, longitude: 78.4865 },
-  { latitude: 17.3862, longitude: 78.4858 },
-  { latitude: 17.3870, longitude: 78.4855 },
-  { latitude: 17.3880, longitude: 78.4860 },
-  { latitude: 17.3890, longitude: 78.4867 },
-  { latitude: 17.3900, longitude: 78.4870 },
-];
+const ETA_THROTTLE_MS = 15_000; // Throttle Distance Matrix API calls to once per 15 seconds
 
 // ─── Utility: bearing between two GPS points (degrees) ──────────────────────
 
@@ -67,20 +53,6 @@ function getBearing(
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-// ─── Utility: generate scattered dummy vehicles around a point ───────────────
-
-function generateDummyVehicles(
-  centerLat: number,
-  centerLng: number,
-  count: number
-) {
-  return Array.from({ length: count }).map((_, i) => ({
-    id: `dummy-${i}`,
-    latitude: centerLat + (Math.random() - 0.5) * 0.012,
-    longitude: centerLng + (Math.random() - 0.5) * 0.012,
-  }));
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function BookingConfirmedScreen() {
@@ -98,8 +70,10 @@ export default function BookingConfirmedScreen() {
   const [isConfirmed, setIsConfirmed] = useState(!!initPayload);
   const [currentStep, setCurrentStep] = useState(0);
   const [canCancel, setCanCancel] = useState(true);
-  const [etaRemaining, setEtaRemaining] = useState(5);
+  const [etaRemaining, setEtaRemaining] = useState<number | null>(null); // null until real ETA arrives
+  const [etaText, setEtaText] = useState<string>('Calculating...');
   const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [driverDetails, setDriverDetails] = useState<{
     id?: string;
     name: string;
@@ -136,22 +110,24 @@ export default function BookingConfirmedScreen() {
     latitude: pickup?.lat ? pickup.lat - 0.005 : 17.38,
     longitude: pickup?.lng ?? 78.4867,
   });
+  const driverCoordRef = useRef({
+    latitude: pickup?.lat ? pickup.lat - 0.005 : 17.38,
+    longitude: pickup?.lng ?? 78.4867,
+  });
   const [driverHeading, setDriverHeading] = useState(0);
 
-  // Dummy vehicles for searching phase
-  const [dummyVehicles, setDummyVehicles] = useState<
-    { id: string; latitude: number; longitude: number }[]
+  // Real online vehicles for searching phase
+  const [onlineVehicles, setOnlineVehicles] = useState<
+    { id: string; latitude: number; longitude: number; type: string }[]
   >([]);
 
   // Animation refs (mutable, avoid stale closures)
-  const animIdRef = useRef<number | null>(null);
   const liveAnimIdRef = useRef<number | null>(null);
-  const indexRef = useRef(0);
-  const progressRef = useRef(0);
-  const frameCountRef = useRef(0);
-  const routeRef = useRef<{ latitude: number; longitude: number }[]>([]);
   const isOtpVerifiedRef = useRef(isOtpVerified);
   const currentStepRef = useRef(currentStep);
+  const receivedLiveLocationRef = useRef(false);
+  const lastEtaFetchRef = useRef(0); // timestamp of last Distance Matrix API call
+  const lastRerouteTimeRef = useRef(0); // timestamp of last Directions API reroute call
   const [chatVisible, setChatVisible] = useState(false);
   const [shareVisible, setShareVisible] = useState(false);
 
@@ -192,144 +168,112 @@ export default function BookingConfirmedScreen() {
       Math.abs(pickupCoord.longitude - dropCoord.longitude) * 2 + 0.01,
   };
 
-  // ─── Animation loop ─────────────────────────────────────────────────────────
+  // ─── Real-time ETA fetcher (throttled) ──────────────────────────────────────
 
-  const animateMarker = useCallback(
-    (points: { latitude: number; longitude: number }[]) => {
-      if (!points || points.length < 2) return;
+  const fetchRealEta = useCallback(async (driverLat: number, driverLng: number) => {
+    const now = Date.now();
+    if (now - lastEtaFetchRef.current < ETA_THROTTLE_MS) return; // throttle
+    lastEtaFetchRef.current = now;
 
-      routeRef.current = [...points];
-      indexRef.current = 0;
-      progressRef.current = 0;
+    // Determine destination: pickup (before OTP) or drop (after ride started)
+    const dest = currentStepRef.current === 0 ? pickupCoord : dropCoord;
 
-      const tick = () => {
-        const route = routeRef.current;
-        const idx = indexRef.current;
+    const result = await fetchDistanceMatrix(
+      { latitude: driverLat, longitude: driverLng },
+      dest,
+    );
 
-        if (idx >= route.length - 1) return; // reached end
-
-        progressRef.current += ANIMATION_SPEED;
-
-        if (progressRef.current >= 1) {
-          // Snap to completed segment, advance index
-          progressRef.current = 0;
-          indexRef.current += 1;
-
-          // ── Polyline trimming: slice off the coordinate we just passed ──
-          const trimmed = route.slice(indexRef.current);
-          routeRef.current = trimmed;
-          indexRef.current = 0; // reset index relative to trimmed array
-          setDriverToPickupCoords(trimmed);
-
-          if (trimmed.length < 2) return; // done
-        }
-
-        const from = routeRef.current[indexRef.current];
-        const to = routeRef.current[indexRef.current + 1];
-        if (!from || !to) return;
-
-        const p = progressRef.current;
-        const lat = from.latitude + (to.latitude - from.latitude) * p;
-        const lng = from.longitude + (to.longitude - from.longitude) * p;
-
-        setDriverCoord({ latitude: lat, longitude: lng });
-        setDriverHeading(getBearing(from, to));
-
-        // Prepend the interpolated driver position to the polyline so there's
-        // no visual gap between the marker and the remaining route line.
-        setDriverToPickupCoords([{ latitude: lat, longitude: lng }, ...routeRef.current.slice(1)]);
-
-        // Removed dynamic camera tracking to prevent map jumping
-
-        animIdRef.current = requestAnimationFrame(tick);
-      };
-
-      animIdRef.current = requestAnimationFrame(tick);
-    },
-    [dropCoord, pickupCoord],
-  );
+    if (result) {
+      const mins = Math.ceil(result.durationSeconds / 60);
+      setEtaRemaining(mins);
+      setEtaText(mins <= 1 ? 'Arriving now' : `${mins} min${mins > 1 ? 's' : ''} away`);
+    }
+  }, [pickupCoord, dropCoord]);
 
   // Smooth animation for REAL GPS updates
   const animateLiveLocation = useCallback((newLoc: { lat: number; lng: number; heading?: number }) => {
-    setDriverCoord(prevCoord => {
-      if (liveAnimIdRef.current) {
-        cancelAnimationFrame(liveAnimIdRef.current);
+    if (liveAnimIdRef.current) {
+      cancelAnimationFrame(liveAnimIdRef.current);
+    }
+
+    const startLat = driverCoordRef.current.latitude;
+    const startLng = driverCoordRef.current.longitude;
+    const endLat = newLoc.lat;
+    const endLng = newLoc.lng;
+
+    let startTime: number | null = null;
+    const DURATION = 4000; // 4 seconds animation for smoother continuous movement
+
+    // --- Path Erasing & Auto-Reroute Logic (Run once per location update, NOT 60fps) ---
+    const activePolylineSetter = currentStepRef.current === 0 ? setDriverToPickupCoords : setPickupToDropCoords;
+    
+    activePolylineSetter(prevPoly => {
+      if (!prevPoly || prevPoly.length < 2) return prevPoly;
+      
+      let minIndex = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < Math.min(prevPoly.length, 15); i++) {
+        const pt = prevPoly[i];
+        const dist = Math.hypot(pt.latitude - newLoc.lat, pt.longitude - newLoc.lng);
+        if (dist < minDist) {
+          minDist = dist;
+          minIndex = i;
+        }
       }
-
-      const startLat = prevCoord.latitude;
-      const startLng = prevCoord.longitude;
-      const endLat = newLoc.lat;
-      const endLng = newLoc.lng;
-
-      let startTime: number | null = null;
-      const DURATION = 1000; // 1 second animation
-
-      const step = (timestamp: number) => {
-        if (!startTime) startTime = timestamp;
-        const progress = Math.min((timestamp - startTime) / DURATION, 1);
-
-        // Ease out quad
-        const easeProgress = progress * (2 - progress);
-
-        const currentLat = startLat + (endLat - startLat) * easeProgress;
-        const currentLng = startLng + (endLng - startLng) * easeProgress;
-
-        setDriverCoord({ latitude: currentLat, longitude: currentLng });
-        
-        if (newLoc.heading != null) {
-          setDriverHeading(newLoc.heading);
-        } else {
-          setDriverHeading(getBearing({ latitude: startLat, longitude: startLng }, { latitude: endLat, longitude: endLng }));
-        }
-
-        // --- Path Erasing Logic ---
-        const activePolylineSetter = currentStepRef.current === 0 ? setDriverToPickupCoords : setPickupToDropCoords;
-        
-        activePolylineSetter(prevPoly => {
-          if (!prevPoly || prevPoly.length < 2) return prevPoly;
-          
-          // Find closest point to erase passed path
-          let minIndex = 0;
-          let minDist = Infinity;
-          for (let i = 0; i < Math.min(prevPoly.length, 15); i++) {
-            const pt = prevPoly[i];
-            const dist = Math.hypot(pt.latitude - currentLat, pt.longitude - currentLng);
-            if (dist < minDist) {
-              minDist = dist;
-              minIndex = i;
+      
+      // Auto-reroute if the driver is completely off the current path (> ~15m)
+      if (minDist > 0.00015) {
+        const now = Date.now();
+        if (now - lastRerouteTimeRef.current > 5000) { // Throttle reroute to once every 5s
+          lastRerouteTimeRef.current = now;
+          const dest = currentStepRef.current === 0 ? pickupCoord : dropCoord;
+          fetchDirectionsPolyline({ latitude: newLoc.lat, longitude: newLoc.lng }, dest).then(newRoute => {
+            if (newRoute && newRoute.length > 0) {
+              activePolylineSetter(newRoute);
             }
-          }
-          
-          // Trim polyline and prepend current animated location to connect it seamlessly
-          const newPolyline = [{ latitude: currentLat, longitude: currentLng }, ...prevPoly.slice(minIndex + 1)];
-          return newPolyline.length > 1 ? newPolyline : prevPoly;
-        });
-
-        // Removed dynamic camera tracking to prevent map jumping
-
-        if (progress < 1) {
-          liveAnimIdRef.current = requestAnimationFrame(step);
+          });
         }
-      };
-
-      liveAnimIdRef.current = requestAnimationFrame(step);
-
-      // Return prevCoord to immediately satisfy the state update, actual animation happens in loop
-      return prevCoord;
+      }
+      
+      const newPolyline = [{ latitude: newLoc.lat, longitude: newLoc.lng }, ...prevPoly.slice(minIndex + 1)];
+      return newPolyline.length > 1 ? newPolyline : prevPoly;
     });
+
+    const calculatedHeading = getBearing({ latitude: startLat, longitude: startLng }, { latitude: endLat, longitude: endLng });
+    if (Math.abs(endLat - startLat) > 0.00001 || Math.abs(endLng - startLng) > 0.00001) {
+      setDriverHeading(calculatedHeading);
+    }
+
+    const step = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / DURATION, 1);
+
+      // Ease out quad
+      const easeProgress = progress * (2 - progress);
+
+      const currentLat = startLat + (endLat - startLat) * easeProgress;
+      const currentLng = startLng + (endLng - startLng) * easeProgress;
+
+      driverCoordRef.current = { latitude: currentLat, longitude: currentLng };
+      setDriverCoord({ latitude: currentLat, longitude: currentLng });
+      
+      // Removed dynamic camera tracking to prevent map jumping
+
+      if (progress < 1) {
+        liveAnimIdRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    liveAnimIdRef.current = requestAnimationFrame(step);
   }, [dropCoord, pickupCoord]);
 
-  // ─── Fetch routes & kick off animation ───────────────────────────────────────
+  // ─── Fetch routes & kick off subscriptions ─────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
+    const unsubs: (() => void)[] = [];
 
     (async () => {
-      // Show scattered dummy vehicles while "searching"
-      setDummyVehicles(
-        generateDummyVehicles(pickupCoord.latitude, pickupCoord.longitude, 4)
-      );
-
       // Fetch real routes from Google Directions API
       const [driverRoute, rideRoute] = await Promise.all([
         fetchDirectionsPolyline(initialDriverCoord, pickupCoord),
@@ -338,34 +282,50 @@ export default function BookingConfirmedScreen() {
 
       if (cancelled) return;
 
-      // If we already received payload via params, we can skip waiting and just use the route!
-      if (initPayload) {
-        setDriverToPickupCoords(driverRoute.length > 2 ? driverRoute : DUMMY_ROUTE);
-        setPickupToDropCoords(rideRoute);
-        animateMarker(driverRoute.length > 2 ? driverRoute : DUMMY_ROUTE);
-        return;
-      }
-
-      // Use API route or fall back to dummy route for testing
-      const finalDriverRoute =
-        driverRoute.length > 2 ? driverRoute : DUMMY_ROUTE;
-
+      const finalDriverRoute = driverRoute.length > 2 ? driverRoute : [initialDriverCoord, pickupCoord];
       setDriverToPickupCoords(finalDriverRoute);
       setPickupToDropCoords(rideRoute);
 
-      // Fit map to show full route
-      const allCoords = [...finalDriverRoute, ...rideRoute];
-      if (mapRef.current && allCoords.length > 1) {
+      // Fit map to show pickup location closely, allowing user to zoom out manually
+      if (mapRef.current && pickupCoord) {
         setTimeout(() => {
-          mapRef.current?.fitToCoordinates(allCoords, {
-            edgePadding: { top: 80, right: 40, bottom: 40, left: 40 },
-            animated: true,
-          });
+          mapRef.current?.animateCamera({
+            center: pickupCoord,
+            zoom: 17,
+            pitch: 0,
+            heading: 0,
+          }, { duration: 1000 });
         }, 500);
       }
 
-      // 🚀 Realtime Integration: Wait for the Driver to accept the ride via WebSocket
-      const unsubscribe = subscribe('ride_accepted', (payload) => {
+      // ── Fetch initial ETA if we already have driver location ──
+      if (initPayload?.driverLat && initPayload?.driverLng) {
+        fetchRealEta(initPayload.driverLat, initPayload.driverLng);
+      }
+    })();
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WebSocket Subscriptions — ALWAYS register these regardless of initPayload
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // 🚀 Live driver location tracking (THE KEY FIX)
+    const unsubDriverLocation = subscribe('driver_location', (payload: any) => {
+      if (cancelled) return;
+      const lat = payload.location?.lat || payload.latitude;
+      const lng = payload.location?.lng || payload.longitude;
+      if (lat != null && lng != null) {
+        receivedLiveLocationRef.current = true;
+        setIsConfirmed(true);
+        animateLiveLocation({ lat, lng, heading: payload.location?.heading || payload.heading });
+        // Fetch real ETA from Google Distance Matrix (throttled)
+        fetchRealEta(lat, lng);
+      }
+    });
+    unsubs.push(unsubDriverLocation);
+
+    // 🚀 Wait for ride acceptance (only relevant when no initPayload)
+    if (!initPayload) {
+      const unsubAccepted = subscribe('ride_accepted', (payload: any) => {
         if (cancelled) return;
         console.log("Ride accepted by driver!", payload);
         setDriverDetails({
@@ -379,75 +339,50 @@ export default function BookingConfirmedScreen() {
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setIsConfirmed(true);
-        animateMarker(finalDriverRoute);
-      });
-
-      // 🚀 Realtime Integration: Listen for live roaming drivers
-      const unsubNearby = subscribe('nearby_drivers', (drivers) => {
-        if (cancelled) return;
-        if (Array.isArray(drivers) && drivers.length > 0) {
-          setDummyVehicles(drivers.map((d: any) => ({
-            id: d.id,
-            latitude: d.lat,
-            longitude: d.lng
-          })));
+        // Fetch initial ETA if driver location is available
+        if (payload.driverLat && payload.driverLng) {
+          fetchRealEta(payload.driverLat, payload.driverLng);
         }
       });
+      unsubs.push(unsubAccepted);
+    }
 
-      // 🚀 Realtime Integration: Live driver location tracking (AWS IoT Core)
-      // When a driver is on their way to pickup, receive their GPS position in real-time
-      if (token && user?.id) {
-        ioTClient.connect(token).then(() => {
-          ioTClient.subscribe(`ridego/rides/${user.id}/location`, (payload) => {
-            if (cancelled) return;
-            if (payload.latitude != null && payload.longitude != null) {
-              // If confirmed, stop the dummy animation and use live location
-              if (!cancelled) {
-                setIsConfirmed(true);
-                if (animIdRef.current) {
-                  cancelAnimationFrame(animIdRef.current);
-                  animIdRef.current = null;
-                }
-                
-                // Trigger smooth animation and path erase
-                animateLiveLocation({ lat: payload.latitude, lng: payload.longitude, heading: payload.heading });
-              }
-            }
-          });
-        }).catch(console.error);
+    // 🚀 Live roaming drivers for search phase
+    const unsubNearby = subscribe('nearby_drivers', (drivers: any) => {
+      if (cancelled) return;
+      if (Array.isArray(drivers) && drivers.length > 0) {
+        setOnlineVehicles(drivers.map((d: any) => ({
+          id: d.id || d.driverId,
+          latitude: d.lat || d.latitude,
+          longitude: d.lng || d.longitude,
+          type: d.type || d.vehicleType || 'bike'
+        })));
+      } else {
+        setOnlineVehicles([]);
       }
-
-      // Cleanup subscription if unmounted
-      return () => {
-        unsubscribe();
-        unsubNearby();
-        if (user?.id) {
-          ioTClient.unsubscribe(`ridego/rides/${user.id}/location`);
-        }
-      };
-    })();
+    });
+    unsubs.push(unsubNearby);
 
     return () => {
       cancelled = true;
-      if (animIdRef.current) cancelAnimationFrame(animIdRef.current);
+      unsubs.forEach(fn => fn());
       if (liveAnimIdRef.current) cancelAnimationFrame(liveAnimIdRef.current);
     };
-  }, [animateLiveLocation, animateMarker, dropCoord, initialDriverCoord, pickupCoord, subscribe, token, user]);
+  }, [animateLiveLocation, fetchRealEta, dropCoord, initialDriverCoord, pickupCoord, subscribe, initPayload]);
 
   // ─── ETA countdown & step progression ────────────────────────────────────────
 
   useEffect(() => {
-    if (!isConfirmed) return;
+    if (!isConfirmed) {
+      const searchTimeout = setTimeout(() => {
+        if (!isConfirmed) setSearchFailed(true);
+      }, 15000);
+      return () => clearTimeout(searchTimeout);
+    }
+  }, [isConfirmed]);
 
-    const etaInterval = setInterval(() => {
-      setEtaRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(etaInterval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  useEffect(() => {
+    if (!isConfirmed) return;
 
     const cancelTimer = setTimeout(() => setCanCancel(false), 15000);
 
@@ -455,7 +390,9 @@ export default function BookingConfirmedScreen() {
     const unsubscribeStatus = subscribe('trip_status_changed', (payload) => {
       console.log('Driver changed trip status:', payload);
       
-      if (payload.status === 'arrived' || payload.status === 'started') {
+      if (payload.status === 'arrived') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (payload.status === 'started') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         if (selectedVehicle !== 'parcel') {
@@ -486,16 +423,15 @@ export default function BookingConfirmedScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         alert("Ride was cancelled by the driver.");
         clearBooking();
-        router.replace("/(tabs)/home");
+        router.replace("/home");
       }
     });
 
     return () => {
-      clearInterval(etaInterval);
       clearTimeout(cancelTimer);
       unsubscribeStatus();
     };
-  }, [clearBooking, isConfirmed, progressAnim, subscribe]);
+  }, [clearBooking, isConfirmed, progressAnim, subscribe, selectedVehicle]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -504,15 +440,15 @@ export default function BookingConfirmedScreen() {
     const riderId = initPayload?.riderId || "rider-001";
     sendMessage("ride_cancel", { riderId, reason: 'cancelled_by_rider' });
     clearBooking();
-    router.replace("/(tabs)/home");
+    router.replace("/home");
   };
 
   const renderVehicleIcon = (size = 20, color = Colors.white) => {
     if (vehicle?.id === 'auto') {
       return <AutoIcon width={size} height={size} />;
     }
-    if (vehicle?.id === 'bike' || vehicle?.id === 'bike-boost' || vehicle?.id === 'bike-metro') {
-      return <BikeIcon width={size} height={size} />;
+    if (vehicle?.id === 'bike' || vehicle?.id === 'bike-boost' || vehicle?.id === 'bike-metro' || vehicle?.id === 'bike-saver') {
+      return <Image source={require("@/assets/images/bike-saver-icon.png")} style={{ width: size, height: size, resizeMode: "contain" }} />;
     }
     if ((vehicle as any)?.useCustomImage) {
       return (
@@ -545,7 +481,7 @@ export default function BookingConfirmedScreen() {
       {/* ── Map ── */}
       <View style={styles.mapContainer}>
         {Platform.OS !== "web" ? (
-          <MapView
+          <MapView userInterfaceStyle="light"
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={mapRegion}
@@ -559,7 +495,7 @@ export default function BookingConfirmedScreen() {
                 <View style={styles.uberPickupDot} />
                 <View style={styles.uberPickupLabelAbsolute}>
                   <View style={styles.uberLabelTime}>
-                    <Text style={styles.uberLabelTimeValue}>5</Text>
+                    <Text style={styles.uberLabelTimeValue}>{etaRemaining != null ? etaRemaining : '–'}</Text>
                     <Text style={styles.uberLabelTimeUnit}>MIN</Text>
                   </View>
                   <View style={styles.uberLabelAddress}>
@@ -585,9 +521,11 @@ export default function BookingConfirmedScreen() {
               </View>
             </Marker>
 
-            {/* Dummy vehicles during search phase */}
+            {/* Real online vehicles during search phase */}
             {!isConfirmed &&
-              dummyVehicles.map((v) => (
+              onlineVehicles
+                .filter(v => v.type.toLowerCase() === (selectedVehicle || 'bike').toLowerCase())
+                .map((v) => (
                 <Marker key={v.id} coordinate={v} zIndex={1}>
                   <View style={[styles.driverMarker, { backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.mediumGrey }]}>
                     {renderVehicleIcon(18, Colors.dark)}
@@ -598,17 +536,23 @@ export default function BookingConfirmedScreen() {
             {/* Live driver marker with rotation */}
             {isConfirmed && (
               <Marker coordinate={driverCoord} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
-                {renderVehicleIcon(40, Colors.dark)}
+                <View style={styles.liveDriverMarkerWrap}>
+                  {selectedVehicle?.includes('auto') ? (
+                    <Image source={require("@/assets/images/auto-logo.png")} style={{ width: 60, height: 60, resizeMode: "contain" }} />
+                  ) : (
+                    <Image source={require("@/assets/images/bike-saver-icon.png")} style={{ width: 60, height: 60, resizeMode: "contain" }} />
+                  )}
+                </View>
               </Marker>
             )}
 
             {/* Driver → Pickup polyline */}
-            {isConfirmed && driverToPickupCoords.length > 1 && (
+            {isConfirmed && !isOtpVerified && driverToPickupCoords.length > 1 && (
               <Polyline coordinates={driverToPickupCoords} strokeColor={Colors.info} strokeWidth={5} />
             )}
 
             {/* Pickup → Drop polyline */}
-            {pickupToDropCoords.length > 1 && (
+            {isOtpVerified && pickupToDropCoords.length > 1 && (
               <Polyline coordinates={pickupToDropCoords} strokeColor={Colors.dark} strokeWidth={5} />
             )}
           </MapView>
@@ -627,9 +571,7 @@ export default function BookingConfirmedScreen() {
           <View style={[styles.etaBadge, { top: insets.top + 12 }]}>
             <Ionicons name="timer-outline" size={16} color={Colors.dark} />
             <Text style={styles.etaText}>
-              {etaRemaining > 0
-                ? `${etaRemaining} min${etaRemaining !== 1 ? "s" : ""} away`
-                : "Driver arrived"}
+              {etaText}
             </Text>
           </View>
         )}
@@ -644,87 +586,111 @@ export default function BookingConfirmedScreen() {
       >
         <BottomSheetScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 20 }}>
           {!isConfirmed ? (
-            <View style={styles.searchingContainer}>
-              <View style={styles.searchingIconBox}>
-                <MaterialCommunityIcons
-                  name="radar"
-                  size={32}
-                  color={Colors.primary}
-                />
+            searchFailed ? (
+              <View style={styles.searchingContainer}>
+                <View style={[styles.searchingIconBox, { backgroundColor: '#FEE2E2', borderColor: '#FEE2E2' }]}>
+                  <Ionicons name="close-circle-outline" size={40} color="#EF4444" />
+                </View>
+                <Text style={styles.searchingTitle}>
+                  All drivers are busy
+                </Text>
+                <Text style={styles.searchingSubtitle}>
+                  We couldn't find a {vehicle?.name ?? "driver"} nearby right now. Please try again or select a different vehicle.
+                </Text>
+                <Pressable style={styles.cancelRequestBtn} onPress={handleCancel}>
+                  <Text style={styles.cancelRequestText}>Go Back</Text>
+                </Pressable>
               </View>
-              <Text style={styles.searchingTitle}>
-                Looking for nearby drivers...
-              </Text>
-              <Text style={styles.searchingSubtitle}>
-                Contacting {vehicle?.name ?? "drivers"} near your pickup point.
-                This usually takes just a few seconds.
-              </Text>
-              <Pressable style={styles.cancelRequestBtn} onPress={handleCancel}>
-                <Text style={styles.cancelRequestText}>Cancel Request</Text>
-              </Pressable>
-            </View>
+            ) : (
+              <View style={styles.searchingContainer}>
+                <View style={styles.searchingIconBox}>
+                  <MaterialCommunityIcons
+                    name="radar"
+                    size={32}
+                    color={Colors.primary}
+                  />
+                </View>
+                <Text style={styles.searchingTitle}>
+                  Looking for nearby drivers...
+                </Text>
+                <Text style={styles.searchingSubtitle}>
+                  Contacting {vehicle?.name ?? "drivers"} near your pickup point.
+                  This usually takes just a few seconds.
+                </Text>
+                <Pressable style={styles.cancelRequestBtn} onPress={handleCancel}>
+                  <Text style={styles.cancelRequestText}>Cancel Request</Text>
+                </Pressable>
+              </View>
+            )
           ) : (
             <>
-              {/* Status steps */}
-              <View style={styles.statusContainer}>
-                {STATUS_STEPS.map((step, index) => (
-                  <View key={step} style={styles.statusStep}>
-                    <View
-                      style={[
-                        styles.statusDot,
-                        index <= currentStep && styles.statusDotActive,
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.statusLabel,
-                        index === currentStep && styles.statusLabelActive,
-                      ]}
-                    >
-                      {step}
-                    </Text>
+              {/* New Uber-like Layout */}
+              
+              <Text style={styles.pickupHeader}>Pick-up in {etaRemaining != null ? etaRemaining : '–'} min</Text>
+              
+              {/* Share PIN Banner — Light Green-Yellow Gradient */}
+              {!isOtpVerified && (
+                <LinearGradient
+                  colors={['#84CC16', '#A3E635', '#FACC15']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.pinBanner}
+                >
+                  <Text style={styles.pinBannerText}>Share PIN</Text>
+                  <View style={styles.pinDigitsWrap}>
+                    {(driverDetails?.otp || "1508").split('').map((digit, i) => (
+                      <View key={i} style={styles.pinDigitBox}>
+                        <Text style={styles.pinDigitText}>{digit}</Text>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-              <View style={styles.progressTrack}>
-                <RNAnimated.View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: progressAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ["0%", "100%"],
-                      }),
-                    },
-                  ]}
-                />
+                </LinearGradient>
+              )}
+
+              {/* Trip details card */}
+              <View style={styles.tripDetailsCard}>
+                <View style={styles.tripDetailsTop}>
+                  <View style={{ flex: 1, paddingRight: 16 }}>
+                    <Text style={styles.tripDetailsLabel}>Trip details</Text>
+                    <Text style={styles.tripDetailsTitle}>Meet at your pick-up spot on {pickup?.address || "Thirumula Colony Road No 2"}</Text>
+                  </View>
+                  <Pressable style={styles.tripDetailsBtn}>
+                    <Ionicons name="ellipsis-horizontal" size={18} color={Colors.dark} />
+                  </Pressable>
+                </View>
+                <View style={styles.cashTag}>
+                  <Ionicons name="cash" size={12} color="#16A34A" />
+                  <Text style={styles.cashTagText}>Cash</Text>
+                </View>
               </View>
 
-              {/* Driver card */}
-              <View style={styles.driverCardUber}>
-                <View style={styles.driverTopRow}>
-                  <View style={styles.driverPhotoWrap}>
-                    <View style={[styles.driverPhoto, styles.driverPhotoPlaceholder]}>
-                      <Ionicons name="person" size={28} color="#9CA3AF" />
+              {/* Driver info card */}
+              <View style={styles.driverCardNew}>
+                <View style={styles.driverCardLeft}>
+                  <View style={styles.driverPhotoWrapNew}>
+                    <View style={styles.driverPhotoNew}>
+                      <Ionicons name="person" size={32} color="#9CA3AF" />
                     </View>
-                    <View style={styles.ratingBadge}>
-                      <Ionicons name="star" size={10} color="#FFB800" />
-                      <Text style={styles.ratingText}>{driverDetails?.rating || 4.9}</Text>
+                    <View style={styles.ratingBadgeNew}>
+                      <Ionicons name="star" size={10} color={Colors.dark} />
+                      <Text style={styles.ratingTextNew}>{driverDetails?.rating || "4.8"}</Text>
                     </View>
                   </View>
-                  <View style={styles.vehicleImgBox}>
-                     {renderVehicleIcon(36, Colors.dark)}
-                  </View>
-                  <View style={styles.driverInfoRight}>
-                    <Text style={styles.plateLarge}>{driverDetails?.plateNumber || "TG 09 A 1234"}</Text>
-                    <Text style={styles.vehicleName}>{vehicle?.name ?? "Honda Shine"}</Text>
-                  </View>
+                  <Text style={styles.driverNameNew}>{driverDetails?.name?.toUpperCase() || "P KURUMURTHI"}</Text>
                 </View>
-                <Text style={styles.driverNameLarge}>{driverDetails?.name?.toUpperCase() || "YOUR DRIVER"}</Text>
-                
-                <View style={styles.otpBanner}>
-                  <Text style={styles.otpBannerLabel}>PIN for this ride</Text>
-                  <Text style={styles.otpBannerValue}>{driverDetails?.otp || "1234"}</Text>
+
+                <View style={styles.vehicleImgBoxNew}>
+                  {selectedVehicle?.includes('auto') ? (
+                    <Image source={require("@/assets/images/auto-logo.png")} style={{ width: 80, height: 80, resizeMode: "contain" }} />
+                  ) : (
+                    <Image source={require("@/assets/images/bike-saver-icon.png")} style={{ width: 80, height: 80, resizeMode: "contain" }} />
+                  )}
+                </View>
+
+                <View style={styles.driverInfoRightNew}>
+                  <Text style={styles.plateLargeNew}>{driverDetails?.plateNumber || "TS25T2648"}</Text>
+                  <Text style={styles.vehicleModelNew}>{vehicle?.name ?? "Yellow Bajaj RE"}</Text>
+                  <Text style={styles.vehicleTypeNew}>Compact</Text>
                 </View>
               </View>
 
@@ -752,7 +718,17 @@ export default function BookingConfirmedScreen() {
                 <Pressable style={styles.iconBtnUber}>
                   <Ionicons name="call-outline" size={20} color={Colors.dark} />
                 </Pressable>
-                <Pressable style={styles.iconBtnUberSos}>
+                <Pressable 
+                  style={styles.iconBtnUberSos}
+                  onPress={() => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    Alert.alert(
+                      "Emergency SOS",
+                      "Emergency contacts and local authorities have been notified with your live location.",
+                      [{ text: "OK", style: "cancel" }]
+                    );
+                  }}
+                >
                   <Ionicons name="shield-outline" size={20} color={Colors.white} />
                   <Text style={styles.sosTextUber}>SOS</Text>
                 </Pressable>
@@ -958,6 +934,207 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderRadius: 2,
   },
+  
+  // Brand Header
+  brandHeader: {
+    position: "absolute",
+    left: 16,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  brandText: {
+    fontSize: 20,
+    fontFamily: "Poppins_700Bold",
+    color: '#2563EB', // Blue text
+    letterSpacing: -0.5,
+  },
+
+  // New Uber-like Layout Styles
+  pickupHeader: {
+    fontSize: 22,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.dark,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  pinBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  pinBannerText: {
+    fontSize: 16,
+    fontFamily: "Poppins_600SemiBold",
+    color: '#1A1A1A',
+  },
+  pinDigitsWrap: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pinDigitBox: {
+    width: 24,
+    height: 28,
+    backgroundColor: '#15803D',
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  liveDriverMarkerWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinDigitText: {
+    fontSize: 14,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.white,
+  },
+
+  tripDetailsCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  tripDetailsTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  tripDetailsLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins_600SemiBold",
+    color: Colors.dark,
+    marginBottom: 4,
+  },
+  tripDetailsTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.dark,
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  tripDetailsBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cashTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
+  cashTagText: {
+    fontSize: 11,
+    fontFamily: "Poppins_600SemiBold",
+    color: '#16A34A',
+  },
+
+  driverCardNew: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  driverCardLeft: {
+    alignItems: "center",
+    width: 80,
+  },
+  driverPhotoWrapNew: {
+    position: "relative",
+    marginBottom: 8,
+  },
+  driverPhotoNew: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  ratingBadgeNew: {
+    position: "absolute",
+    bottom: -6,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.white,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  ratingTextNew: {
+    fontSize: 10,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.dark,
+  },
+  driverNameNew: {
+    fontSize: 11,
+    fontFamily: "Poppins_600SemiBold",
+    color: Colors.dark,
+    textAlign: "center",
+  },
+  vehicleImgBoxNew: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  driverInfoRightNew: {
+    alignItems: "flex-end",
+    width: 100,
+  },
+  plateLargeNew: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.dark,
+    marginBottom: 2,
+  },
+  vehicleModelNew: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    color: Colors.grey,
+    textAlign: "right",
+  },
+  vehicleTypeNew: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    color: Colors.grey,
+    textAlign: "right",
+  },
+
   // Uber Styles
   uberMarkerWrapper: { width: 16, height: 16, alignItems: "center", justifyContent: "center", overflow: "visible" },
   uberPickupDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.dark, borderWidth: 2, borderColor: Colors.white, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
