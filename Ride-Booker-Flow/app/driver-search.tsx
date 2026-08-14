@@ -126,26 +126,10 @@ export default function DriverSearchScreen() {
   useEffect(() => {
     // Listen for a driver accepting the ride (server emits 'ride_accepted')
     const unsub1 = subscribe("ride_accepted", (payload: any) => {
-      const d: DriverInfo = {
-        name: payload.driverName ?? payload.driverId ?? "Driver",
-        rating: payload.rating ?? 4.9,
-        vehicle: payload.vehicle ?? "Honda Shine",
-        plate: payload.plate ?? "TG10E7584",
-        photoUrl: payload.photoUrl ?? "",
-        lat: payload.driverLat ?? pickupLat + 0.003,
-        lng: payload.driverLng ?? pickupLng + 0.002,
-        languages: payload.languages ?? ["English", "Hindi"],
-      };
-      setDriver(d);
-      setDriverLat(d.lat);
-      setDriverLng(d.lng);
-      setEtaMinutes(payload.eta ?? 5);
-      setState("matched");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Auto-navigate to booking-confirmed once matched (instant transition)
+      const routePath = selectedVehicle === "parcel" ? "/parcel-confirmed" : "/booking-confirmed";
       router.replace({
-        pathname: "/booking-confirmed",
+        pathname: routePath as any,
         params: { payload: JSON.stringify(payload) }
       });
     });
@@ -312,99 +296,7 @@ export default function DriverSearchScreen() {
           </View>
         )}
 
-        {/* ─── STATE 3: Driver matched ────────────────────────── */}
-        {state === "matched" && driver && (
-          <View>
-            {/* ETA */}
-            <Text style={st.etaTitle}>Pick-up in {etaMinutes} min</Text>
-
-            {/* Delivery details card */}
-            <View style={st.detailsCard}>
-              <Text style={st.detailsLabel}>Delivery details</Text>
-              <Text style={st.detailsAddress} numberOfLines={1}>
-                Pick-up at {pickup?.address ?? "your location"}
-              </Text>
-              <View style={st.badgeRow}>
-                <View style={st.greyBadge}>
-                  <Text style={st.greyBadgeText}>Meet at curb</Text>
-                </View>
-                <View style={st.cashBadge}>
-                  <MaterialCommunityIcons name="cash" size={14} color="#22C55E" />
-                  <Text style={st.cashBadgeText}>Cash</Text>
-                </View>
-              </View>
-              <View style={st.editRow}>
-                <Pressable style={st.editBtn}>
-                  <Ionicons name="pencil" size={14} color="#6B7280" />
-                  <Text style={st.editBtnText}>Edit pick-up instructi...</Text>
-                </Pressable>
-                <Pressable style={st.moreBtn}>
-                  <Ionicons name="ellipsis-horizontal" size={18} color="#6B7280" />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Driver card */}
-            <View style={st.driverCard}>
-              <View style={st.driverTopRow}>
-                {/* Photo + rating */}
-                <View style={st.driverPhotoWrap}>
-                  {driver.photoUrl ? (
-                    <Image source={{ uri: driver.photoUrl }} style={st.driverPhoto} />
-                  ) : (
-                    <View style={[st.driverPhoto, st.driverPhotoPlaceholder]}>
-                      <Ionicons name="person" size={28} color="#9CA3AF" />
-                    </View>
-                  )}
-                  <View style={st.ratingBadge}>
-                    <Ionicons name="star" size={10} color="#FFB800" />
-                    <Text style={st.ratingText}>{driver.rating.toFixed(2)}</Text>
-                  </View>
-                </View>
-                {/* Vehicle icon */}
-                <View style={st.vehicleImgBox}>
-                  <MaterialCommunityIcons name={vehicleIconName as any} size={36} color={Colors.dark} />
-                </View>
-                {/* Driver info right */}
-                <View style={st.driverInfoRight}>
-                  <Text style={st.plateLarge}>{driver.plate}</Text>
-                  <Text style={st.vehicleName}>{driver.vehicle}</Text>
-                  <Text style={st.langText}>
-                    Knows {driver.languages.join(" & ")}
-                  </Text>
-                </View>
-              </View>
-              {/* Driver name */}
-              <Text style={st.driverName}>{driver.name.toUpperCase()}</Text>
-
-              {/* Action buttons */}
-              <View style={st.actionRow}>
-                <Pressable
-                  style={st.msgBtn}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push({
-                      pathname: "/chat" as any,
-                      params: { 
-                        driverId: driver.name,
-                        socketUrl: PUBLIC_WEBSOCKET_URL
-                      },
-                    });
-                  }}
-                >
-                  <Ionicons name="chatbubble-outline" size={18} color={Colors.white} />
-                  <Text style={st.msgBtnText}>Send a message</Text>
-                </Pressable>
-                <Pressable style={st.iconBtn}>
-                  <Ionicons name="call-outline" size={20} color={Colors.dark} />
-                </Pressable>
-                <Pressable style={st.iconBtn}>
-                  <Ionicons name="ellipsis-horizontal" size={20} color={Colors.dark} />
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        )}
+        {/* ─── STATE 3: Driver matched (Handled by routing) ─── */}
       </View>
     </View>
   );
@@ -491,68 +383,8 @@ const st = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted, borderRadius: 20, padding: 20,
   },
 
-  // ETA
-  etaTitle: { fontSize: 24, fontFamily: "Poppins_700Bold", color: Colors.dark, textAlign: "center", marginBottom: 16 },
-
-  // Delivery details
-  detailsCard: {
-    backgroundColor: Colors.surfaceMuted, borderRadius: 20, padding: 20, marginBottom: 16,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  detailsLabel: { fontSize: 12, fontFamily: "Poppins_600SemiBold", color: Colors.grey, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
-  detailsAddress: { fontSize: 18, fontFamily: "Poppins_700Bold", color: Colors.dark, marginBottom: 12 },
-  badgeRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
-  greyBadge: { backgroundColor: Colors.lightGrey, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  greyBadgeText: { fontSize: 13, fontFamily: "Poppins_600SemiBold", color: Colors.darkSecondary },
-  cashBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.success + "15", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  cashBadgeText: { fontSize: 13, fontFamily: "Poppins_700Bold", color: Colors.success },
-  editRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
-  editBtn: { flexDirection: "row", alignItems: "center", gap: 8 },
-  editBtnText: { fontSize: 14, fontFamily: "Poppins_600SemiBold", color: Colors.grey },
-  moreBtn: { padding: 6, backgroundColor: Colors.lightGrey, borderRadius: 12 },
-
-  // Driver card
-  driverCard: {
-    backgroundColor: Colors.white, borderRadius: 24, borderWidth: 1.5, borderColor: Colors.dark,
-    padding: 20,
-    shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4,
-  },
-  driverTopRow: { flexDirection: "row", alignItems: "center", gap: 16 },
-  driverPhotoWrap: { position: "relative" },
-  driverPhoto: { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.lightGrey },
-  driverPhotoPlaceholder: { alignItems: "center", justifyContent: "center" },
-  ratingBadge: {
-    position: "absolute", bottom: -6, left: 10,
-    flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: Colors.white, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4,
-    borderWidth: 1, borderColor: Colors.border,
-    shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
-  },
-  ratingText: { fontSize: 11, fontFamily: "Poppins_700Bold", color: Colors.dark },
-  vehicleImgBox: {
-    width: 56, height: 48, alignItems: "center", justifyContent: "center",
-    backgroundColor: Colors.surfaceMuted, borderRadius: 12,
-  },
-  driverInfoRight: { flex: 1, alignItems: "flex-end" },
-  plateLarge: { fontSize: 18, fontFamily: "Poppins_700Bold", color: Colors.dark },
-  vehicleName: { fontSize: 13, fontFamily: "Poppins_500Medium", color: Colors.grey, marginTop: 2 },
-  langText: { fontSize: 12, fontFamily: "Poppins_500Medium", color: Colors.grey, marginTop: 2 },
-  driverName: { fontSize: 16, fontFamily: "Poppins_700Bold", color: Colors.dark, marginTop: 16, letterSpacing: 1 },
-
   driverMarkerUber: {
     width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center",
     shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
-  },
-  // Action buttons
-  actionRow: { flexDirection: "row", gap: 12, marginTop: 16 },
-  msgBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    backgroundColor: Colors.dark, borderRadius: 16, height: 56,
-    shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
-  },
-  msgBtnText: { fontSize: 16, fontFamily: "Poppins_700Bold", color: Colors.white },
-  iconBtn: {
-    width: 56, height: 56, borderRadius: 16, backgroundColor: Colors.surfaceMuted,
-    alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: Colors.border,
   },
 });
