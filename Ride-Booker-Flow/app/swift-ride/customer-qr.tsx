@@ -74,7 +74,7 @@ export default function CustomerQRScreen() {
   const qrPayload = useMemo(
     () =>
       JSON.stringify({
-        type: "instant_ride",
+        type: "swift_ride",
         bookingId,
         riderId: user?.id || "anonymous",
         code: fallbackCode,
@@ -119,7 +119,7 @@ export default function CustomerQRScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const unsub = subscribe("instant_ride_started", (payload: any) => {
+    const unsub = subscribe("swift_ride_started", (payload: any) => {
       if (payload?.bookingId === bookingId || payload?.code === fallbackCode) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setRideStarted(true);
@@ -213,7 +213,7 @@ export default function CustomerQRScreen() {
         <View style={s.instructionRow}>
         <MaterialCommunityIcons name="qrcode-scan" size={20} color={Colors.accent} />
         <Text style={s.instructionText}>
-          Let the driver scan this QR code to start your ride instantly
+          Let the driver scan this QR code to start your Swift ride
         </Text>
       </View>
 

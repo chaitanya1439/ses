@@ -62,7 +62,7 @@ function RootLayoutNav() {
       <Stack.Screen name="review-delivery" />
       <Stack.Screen name="parcel-confirmed" />
       <Stack.Screen name="my-rides" />
-      <Stack.Screen name="instant-ride" />
+      <Stack.Screen name="swift-ride" />
     </Stack>
   );
 }
