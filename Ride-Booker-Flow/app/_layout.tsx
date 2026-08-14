@@ -23,11 +23,17 @@ SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { subscribe } = useSocket();
-  const { selectedVehicle } = useBooking();
+  const { selectedVehicle, setActiveTrip } = useBooking();
 
   useEffect(() => {
+    const unsubSync = subscribe("sync_state", (payload: any) => {
+      console.log(`[Global] sync_state received`, payload);
+      setActiveTrip(payload);
+    });
+    
     const unsub = subscribe("ride_accepted", (payload: any) => {
       console.log(`[Global] ride_accepted received, navigating to ${selectedVehicle === 'parcel' ? 'parcel-confirmed' : 'booking-confirmed'}`);
+      setActiveTrip(payload);
       
       if (selectedVehicle === "parcel" || payload?.type === "parcel") {
         router.push({
@@ -41,8 +47,11 @@ function RootLayoutNav() {
         });
       }
     });
-    return () => unsub();
-  }, [subscribe, selectedVehicle]);
+    return () => {
+      unsub();
+      unsubSync();
+    };
+  }, [subscribe, selectedVehicle, setActiveTrip]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

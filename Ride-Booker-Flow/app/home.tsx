@@ -71,7 +71,7 @@ function PromoBadge({ text }: { text: string }) {
 // ══════════════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { setPickup, setDrop } = useBooking();
+  const { setPickup, setDrop, activeTrip } = useBooking();
   const location = useCurrentLocation();
 
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
@@ -255,6 +255,28 @@ export default function HomeScreen() {
         <Pressable style={styles.menuBtn} onPress={() => setIsMenuOpen(true)}>
           <Ionicons name="menu" size={24} color={Colors.dark} />
         </Pressable>
+        
+        {activeTrip && activeTrip.status !== "completed" && activeTrip.status !== "cancelled_by_rider" && activeTrip.status !== "cancelled_by_driver" && (
+          <Pressable 
+            style={styles.activeTripBanner} 
+            onPress={() => {
+              const isParcel = activeTrip.vehicleType === "parcel" || activeTrip.type === "parcel";
+              router.push({
+                pathname: isParcel ? "/parcel-confirmed" : "/booking-confirmed",
+                params: { payload: JSON.stringify(activeTrip) }
+              });
+            }}
+          >
+            <View style={styles.activeTripContent}>
+              <Ionicons name="car-sport" size={24} color={Colors.white} />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.activeTripTitle}>Ongoing Trip</Text>
+                <Text style={styles.activeTripSub}>Tap to view trip details</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.white} />
+            </View>
+          </Pressable>
+        )}
       </View>
 
       {/* Scrollable Bottom Sheet Overlay */}
@@ -426,8 +448,12 @@ const styles = StyleSheet.create({
 
   container: { flex: 1, backgroundColor: Colors.white },
   userDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.info, borderWidth: 3, borderColor: Colors.white, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
-  topBar: { paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 },
-  menuBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white, alignItems: "center", justifyContent: "center", shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
+  topBar: { paddingHorizontal: 20, flexDirection: 'row', zIndex: 10, alignItems: 'flex-start' },
+  menuBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white, alignItems: "center", justifyContent: "center", shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5, marginRight: 16 },
+  activeTripBanner: { flex: 1, backgroundColor: Colors.dark, borderRadius: 16, padding: 12, shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 8 },
+  activeTripContent: { flexDirection: 'row', alignItems: 'center' },
+  activeTripTitle: { fontSize: 14, fontFamily: "Poppins_700Bold", color: Colors.white },
+  activeTripSub: { fontSize: 11, fontFamily: "Poppins_500Medium", color: Colors.lightGrey },
   bottomSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingBottom: 40, minHeight: height * 0.6, shadowColor: Colors.black, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 16, elevation: 10 },
   handleBarWrap: { width: '100%', alignItems: 'center', paddingVertical: 12 },
   handleBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },

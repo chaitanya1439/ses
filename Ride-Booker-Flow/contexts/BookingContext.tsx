@@ -24,6 +24,7 @@ interface BookingContextValue {
   selectedVehicle: string;
   bookingFor: string;
   fare: number;
+  activeTrip: any | null;
   routeDetails: RouteDetails | null;
   setPickup: (loc: Location | null) => void;
   setDrop: (loc: Location | null) => void;
@@ -31,6 +32,7 @@ interface BookingContextValue {
   setBookingFor: (name: string) => void;
   setFare: (fare: number) => void;
   setRouteDetails: (details: RouteDetails | null) => void;
+  setActiveTrip: (trip: any | null) => void;
   clearBooking: () => void;
 }
 
@@ -43,6 +45,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [bookingFor, setBookingFor] = useState("Myself");
   const [fare, setFare] = useState(0);
   const [routeDetails, setRouteDetails] = useState<RouteDetails | null>(null);
+  const [activeTrip, setActiveTrip] = useState<any | null>(null);
 
   const clearBooking = () => {
     setPickup(null);
@@ -51,6 +54,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setBookingFor("Myself");
     setFare(0);
     setRouteDetails(null);
+    setActiveTrip(null);
   };
 
   const value = useMemo(
@@ -61,15 +65,17 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       bookingFor,
       fare,
       routeDetails,
+      activeTrip,
       setPickup,
       setDrop,
       setSelectedVehicle,
       setBookingFor,
       setFare,
       setRouteDetails,
+      setActiveTrip,
       clearBooking,
     }),
-    [pickup, drop, selectedVehicle, bookingFor, fare, routeDetails]
+    [pickup, drop, selectedVehicle, bookingFor, fare, routeDetails, activeTrip]
   );
 
   return (
