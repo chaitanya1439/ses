@@ -32,6 +32,7 @@ export default function HomeScreen() {
     setIncomingRide, setShowRidePopup,
     todayEarnings, completedRides, loadRides,
     syncRide,
+    activeRide,
   } = useRide();
   const { driver } = useAuth();
 
@@ -359,6 +360,21 @@ export default function HomeScreen() {
           onHeartPress={() => router.push('/go-to-area')}
           onBellPress={() => router.push('/notification')}
         />
+        {activeRide && (
+          <Pressable 
+            style={[styles.activeTripBanner, { marginHorizontal: 16, marginTop: 8 }]} 
+            onPress={() => router.push('/active-ride')}
+          >
+            <View style={styles.activeTripContent}>
+              <Ionicons name="car-sport" size={24} color="#FFF" />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.activeTripTitle}>Ongoing Ride</Text>
+                <Text style={styles.activeTripSub}>Tap to return to your active ride</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#FFF" />
+            </View>
+          </Pressable>
+        )}
       </View>
 
       {/* === PULL-UP BOTTOM SHEET === */}
@@ -505,7 +521,7 @@ export default function HomeScreen() {
               >
                 <MaterialCommunityIcons name="qrcode-scan" size={28} color={theme.colors.primary} />
                 <Text style={[styles.quickActionValue, { color: theme.colors.primary }]}>Scan QR</Text>
-                <Text style={styles.quickActionLabel}>Instant Ride</Text>
+                <Text style={styles.quickActionLabel}>Swift Ride</Text>
               </Pressable>
             </View>
           </View>
@@ -622,6 +638,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.card,
+  },
+  activeTripBanner: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 16,
+    padding: 12,
+    ...theme.shadows.card,
+  },
+  activeTripContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activeTripTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins_700Bold",
+    color: "#FFF",
+  },
+  activeTripSub: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    color: "rgba(255, 255, 255, 0.8)",
   },
 
   // Quick actions section
