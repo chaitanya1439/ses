@@ -84,7 +84,7 @@ export default function LoginScreen() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to login to backend");
 
-      await login(`+91${phone}`, data.token);
+      await login(`+91${phone}`, data.token, data.id);
       
       if (data.isNewUser) {
         router.replace("/update-profile" as any);
