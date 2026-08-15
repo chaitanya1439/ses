@@ -162,8 +162,6 @@ export function RideRequestPopup() {
     outputRange: ['0%', '100%'],
   });
 
-  const stars = Array.from({ length: 5 }, (_, i) => i < Math.floor(incomingRide.customer.rating));
-
   return (
     <Modal transparent visible={showRidePopup} animationType="none">
       <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999, elevation: 9999 }]}>
@@ -263,12 +261,6 @@ export function RideRequestPopup() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.customerName}>{incomingRide.customer.name}</Text>
-              <View style={styles.starsRow}>
-                {stars.map((filled, i) => (
-                  <Ionicons key={i} name={filled ? 'star' : 'star-outline'} size={11} color={theme.colors.primary} />
-                ))}
-                <Text style={styles.ratingText}>{incomingRide.customer.rating}</Text>
-              </View>
             </View>
           </View>
 

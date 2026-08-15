@@ -176,7 +176,7 @@ export default function DriverScannerScreen() {
         attempts++;
         setRetryCount(attempts);
 
-        sendMessage("instant_ride_start", {
+        sendMessage("swift_ride_start", {
           bookingId: data.bookingId,
           riderId: data.riderId,
           driverId: driver?.id || "driver",
@@ -215,7 +215,7 @@ export default function DriverScannerScreen() {
       try {
         const data: ScannedPayload = JSON.parse(result.data);
 
-        if (data.type !== "instant_ride" || !data.bookingId) {
+        if (data.type !== "swift_ride" || !data.bookingId) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           scanLockRef.current = false;
           return;
@@ -238,7 +238,7 @@ export default function DriverScannerScreen() {
 
   // ── Listen for ride confirmation from server ──
   useEffect(() => {
-    const unsub = subscribe("instant_ride_confirmed", (payload: any) => {
+    const unsub = subscribe("swift_ride_confirmed", (payload: any) => {
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
@@ -303,7 +303,7 @@ export default function DriverScannerScreen() {
     setScreenState("processing");
 
     const manualPayload: ScannedPayload = {
-      type: "instant_ride",
+      type: "swift_ride",
       bookingId: `MANUAL-${Date.now().toString(36).toUpperCase()}`,
       riderId: "manual-entry",
       code,

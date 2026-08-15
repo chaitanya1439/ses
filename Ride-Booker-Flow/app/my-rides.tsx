@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,21 +7,51 @@ import {
   FlatList,
   StatusBar,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
-import { mockRides } from "@/constants/mockData";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Filter = "all" | "completed" | "cancelled";
 
+interface Ride {
+  id: string;
+  vehicle: "Bike" | "Scooty" | "Auto" | "Car";
+  status: "completed" | "cancelled" | "upcoming";
+  date: string;
+  time: string;
+  pickup: string;
+  drop: string;
+  fare: number;
+}
+
 export default function MyRidesScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<Filter>("all");
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = mockRides.filter((r) => {
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    fetch(`https://real.shelteric.com/api/rider/history/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setRides(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch rides", err);
+        setLoading(false);
+      });
+  }, [user?.id]);
+
+  const filtered = rides.filter((r) => {
     if (filter === "all") return true;
     return r.status === filter;
   });
@@ -69,10 +99,15 @@ export default function MyRidesScreen() {
       </View>
 
       {/* Ride List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: insets.bottom + 20 },
@@ -171,6 +206,7 @@ export default function MyRidesScreen() {
           </View>
         }
       />
+      )}
     </View>
   );
 }

@@ -232,10 +232,6 @@ export default function ActiveRideScreen() {
           </View>
           <View style={styles.customerInfo}>
             <Text style={styles.customerName}>{activeRide.customer.name}</Text>
-            <View style={styles.starsRow}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>{activeRide.customer.rating} <Text style={{color: '#9CA3AF'}}>• Rider</Text></Text>
-            </View>
           </View>
           <View style={styles.contactActions}>
             <Pressable 

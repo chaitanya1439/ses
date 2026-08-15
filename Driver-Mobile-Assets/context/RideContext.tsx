@@ -10,7 +10,7 @@ export interface Location {
 export interface Customer {
   id: string;
   name: string;
-  rating: number;
+  phone?: string;
 }
 
 export interface RideRequest {
@@ -87,9 +87,8 @@ export function generateMockRide(): RideRequest {
   return {
     id: `R${Date.now()}`,
     customer: {
-      id: `C${Date.now()}`,
+      id: 'CUST-1234',
       name: CUSTOMER_NAMES[Math.floor(Math.random() * CUSTOMER_NAMES.length)],
-      rating: parseFloat((3.8 + Math.random() * 1.2).toFixed(1)),
     },
     pickup,
     drop,

@@ -130,7 +130,6 @@ export default function HomeScreen() {
           customer: {
             id: data.riderId || `C${Date.now()}`,
             name: data.riderName || 'Rider',
-            rating: 4.8,
           },
           pickup: {
             address: data.pickupAddress || (data.pickupLocation as any)?.address || 'Pickup Location',
@@ -264,7 +263,6 @@ export default function HomeScreen() {
             id: payload.riderId || `C${Date.now()}`,
             name: payload.riderName || 'Rider',
             phone: payload.riderPhone || '',
-            rating: 4.8,
           },
           pickup: {
             address: payload.pickupLocation?.address || 'Pickup Location',

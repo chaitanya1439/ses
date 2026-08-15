@@ -10,14 +10,40 @@ import { useRide } from '@/context/RideContext';
 import { OrderCard } from '@/components/OrderCard';
 import { theme } from '@/constants/colors';
 
+import { useAuth } from '@/context/AuthContext';
+
+export interface CompletedRide {
+  id: string;
+  date: string;
+  pickup: string;
+  drop: string;
+  fare: number;
+  status: 'completed' | 'cancelled';
+  timestamp: number;
+}
+
 type Filter = 'all' | 'completed' | 'cancelled';
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
-  const { completedRides, loadRides } = useRide();
+  const { driver } = useAuth();
+  const [completedRides, setCompletedRides] = useState<CompletedRide[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { loadRides(); }, [loadRides]);
+  useEffect(() => {
+    if (!driver?.id) return;
+    fetch(`https://real.shelteric.com/api/driver/history/${driver.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setCompletedRides(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch driver rides", err);
+        setLoading(false);
+      });
+  }, [driver?.id]);
 
   const filtered = completedRides.filter(r => {
     if (filter === 'all') return true;
@@ -53,10 +79,15 @@ export default function OrdersScreen() {
         ))}
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => <OrderCard ride={item} />}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: theme.colors.textMuted }}>Loading...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => <OrderCard ride={item} />}
         contentContainerStyle={[
           styles.list,
           { paddingBottom: insets.bottom + 100 },
@@ -76,6 +107,7 @@ export default function OrdersScreen() {
         }
         scrollEnabled={!!filtered.length}
       />
+      )}
     </View>
   );
 }

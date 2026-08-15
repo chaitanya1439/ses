@@ -86,8 +86,8 @@ export default function BookingConfirmedScreen() {
     lng?: number;
   } | null>(
     initPayload ? {
-      id: initPayload.driverId || initPayload.driverName || 'driver',
-      name: initPayload.driverName || (initPayload.driverId ? `Driver #${initPayload.driverId.substring(0,4)}` : "Your Driver"),
+      id: initPayload.driverId || 'driver',
+      name: initPayload.driverName || "Your Driver",
       phone: initPayload.driverPhone || '',
       rating: initPayload.rating || 4.9,
       plateNumber: initPayload.vehicleNumber || initPayload.plate || "TG 09 A 1234",
@@ -332,8 +332,8 @@ export default function BookingConfirmedScreen() {
         if (cancelled) return;
         console.log("Ride accepted by driver!", payload);
         setDriverDetails({
-          id: payload.driverId || payload.driverName || 'driver',
-          name: payload.driverName || (payload.driverId ? `Driver #${payload.driverId.substring(0,4)}` : "Your Driver"),
+          id: payload.driverId || 'driver',
+          name: payload.driverName || "Your Driver",
           phone: payload.driverPhone || '',
           rating: payload.rating || 4.9,
           plateNumber: payload.vehicleNumber || payload.plate || "TG 09 A 1234",
