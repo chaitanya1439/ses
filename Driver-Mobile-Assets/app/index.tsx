@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Platform, Text } from 'react-native';
+import { View, StyleSheet, Animated, Platform, Text, Image } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -44,10 +44,10 @@ export default function SplashScreen() {
     >
       <View style={styles.content}>
         <Animated.View style={[styles.logoContainer, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-          <View style={styles.logoCircle}>
-            <MaterialCommunityIcons name="steering" size={72} color={theme.colors.primary} />
-          </View>
-          <View style={styles.glowRing} />
+          <Image 
+            source={require('@/assets/images/logo.png')} 
+            style={{ width: 140, height: 140, resizeMode: 'contain' }} 
+          />
         </Animated.View>
 
         <Animated.View style={{ opacity: textOpacity }}>
@@ -97,24 +97,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-  },
-  logoCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255,184,0,0.12)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,184,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  glowRing: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 1,
-    borderColor: 'rgba(255,184,0,0.1)',
   },
   appName: {
     fontSize: 40,

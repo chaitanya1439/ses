@@ -9,7 +9,7 @@ interface BrandLogoProps {
 export default function BrandLogo({ width = 120, height = 120 }: BrandLogoProps) {
   return (
     <Image 
-      source={require('@/assets/images/mtrip-logo.png')} 
+      source={require('@/assets/images/logo.png')} 
       style={{ width, height, resizeMode: 'contain' }} 
     />
   );

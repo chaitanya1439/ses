@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   StatusBar,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -59,12 +60,10 @@ export default function SplashScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.primary} />
       <Animated.View style={[styles.logoContainer, animatedStyle]}>
-        <View style={styles.iconWrapper}>
-          <MaterialCommunityIcons name="map-marker" size={64} color={Colors.dark} />
-          <View style={styles.bikeOverlay}>
-            <MaterialCommunityIcons name="motorbike" size={22} color={Colors.primary} />
-          </View>
-        </View>
+        <Image 
+          source={require('@/assets/images/logo.png')} 
+          style={{ width: 150, height: 150, resizeMode: 'contain' }} 
+        />
         <Text style={styles.appName}>
           M<Text style={{color: '#EF4444'}}>!</Text> tr<Text style={{color: '#F59E0B'}}>!</Text>p
         </Text>
@@ -84,20 +83,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: "center",
     gap: 12,
-  },
-  iconWrapper: {
-    width: 100,
-    height: 100,
-    backgroundColor: Colors.dark,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  bikeOverlay: {
-    position: "absolute",
-    bottom: 10,
-    right: 6,
   },
   appName: {
     fontSize: 40,
