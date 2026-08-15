@@ -86,6 +86,7 @@ export default function BookingConfirmedScreen() {
     otp: string;
     lat?: number;
     lng?: number;
+    profileImageUrl?: string;
   } | null>(
     initPayload ? {
       id: initPayload.driverId || 'driver',
@@ -97,6 +98,7 @@ export default function BookingConfirmedScreen() {
       otp: initPayload.otp || "1234",
       lat: initPayload.driverLat,
       lng: initPayload.driverLng,
+      profileImageUrl: initPayload.profileImageUrl,
     } : null
   );
   
@@ -694,7 +696,14 @@ export default function BookingConfirmedScreen() {
                 <View style={styles.driverCardLeft}>
                   <View style={styles.driverPhotoWrapNew}>
                     <View style={styles.driverPhotoNew}>
-                      <Ionicons name="person" size={32} color="#9CA3AF" />
+                      {driverDetails?.profileImageUrl ? (
+                        <Image 
+                          source={{ uri: driverDetails.profileImageUrl }} 
+                          style={{ width: '100%', height: '100%', borderRadius: 100 }} 
+                        />
+                      ) : (
+                        <Ionicons name="person" size={32} color="#9CA3AF" />
+                      )}
                     </View>
                     <View style={[styles.ratingBadgeNew, { flexDirection: 'row', gap: 4, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2 }]}>
                       <Ionicons name="star" size={10} color={Colors.dark} />
