@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
 import { useBooking } from "@/contexts/BookingContext";
 import { useSocket } from "@/contexts/SocketContext";
+import RatingModal from "@/components/RatingModal";
 import ChatModal from "@/components/ChatModal";
 import ShareTripModal from "@/components/ShareTripModal";
 import { mockDriver, vehicleOptions } from "@/constants/mockData";
@@ -113,6 +114,7 @@ export default function ParcelConfirmedScreen() {
     name: string;
     phone?: string;
     rating: number;
+    rideCount?: number;
     plateNumber: string;
     otp: string;
     dropOtp: string;
@@ -120,10 +122,11 @@ export default function ParcelConfirmedScreen() {
     lng?: number;
   } | null>(
     initPayload ? {
-      id: initPayload.driverId || initPayload.driverName || 'driver',
-      name: initPayload.driverName || (initPayload.driverId ? `Driver #${initPayload.driverId.substring(0,4)}` : "Your Driver"),
+      id: initPayload.driverId || 'driver',
+      name: initPayload.driverName || "Your Driver",
       phone: initPayload.driverPhone || '',
-      rating: initPayload.rating || 4.9,
+      rating: initPayload.driverRating || 0,
+      rideCount: initPayload.driverRideCount || 0,
       plateNumber: initPayload.vehicleNumber || initPayload.plate || "TG 09 A 1234",
       otp: initPayload.otp || "1234",
       dropOtp: initPayload.dropOtp || "5678",
@@ -167,6 +170,7 @@ export default function ParcelConfirmedScreen() {
   const lastRerouteTimeRef = useRef(0); // timestamp of last Directions API reroute call
   const [chatVisible, setChatVisible] = useState(false);
   const [shareVisible, setShareVisible] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const [isMapCentered, setIsMapCentered] = useState(true);
 
   useEffect(() => {
@@ -391,10 +395,11 @@ export default function ParcelConfirmedScreen() {
         if (cancelled) return;
         console.log("Ride accepted by driver!", payload);
         setDriverDetails({
-          id: payload.driverId || payload.driverName || 'driver',
-          name: payload.driverName || (payload.driverId ? `Driver #${payload.driverId.substring(0,4)}` : "Your Driver"),
+          id: payload.driverId || 'driver',
+          name: payload.driverName || "Your Driver",
           phone: payload.driverPhone || '',
-          rating: payload.rating || 4.9,
+          rating: payload.driverRating || 0,
+          rideCount: payload.driverRideCount || 0,
           plateNumber: payload.vehicleNumber || payload.plate || "TG 09 A 1234",
           otp: payload.otp || "1234",
           dropOtp: payload.dropOtp || "5678",
@@ -499,7 +504,7 @@ export default function ParcelConfirmedScreen() {
         }).start();
       } else if (payload.status === 'completed') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setCurrentStep(2);
+        setCurrentStep(4); // Dropoff completed
         RNAnimated.timing(progressAnim, {
           toValue: 1,
           duration: 500,
@@ -507,9 +512,8 @@ export default function ParcelConfirmedScreen() {
         }).start();
         
         setTimeout(() => {
-          clearBooking();
-          router.replace("/home");
-        }, 3000);
+          setShowRatingModal(true);
+        }, 1500);
       } else if (payload.status === 'cancelled') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         alert("Ride was cancelled by the driver.");
@@ -526,6 +530,23 @@ export default function ParcelConfirmedScreen() {
   }, [clearBooking, isConfirmed, progressAnim, subscribe]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
+
+  const handleSubmitRating = (rating: number) => {
+    sendMessage("submit_feedback", { 
+      tripId: initPayload?.tripId || "trip-123", 
+      toUserId: driverDetails?.id, 
+      rating 
+    });
+    setShowRatingModal(false);
+    clearBooking();
+    router.replace("/home");
+  };
+
+  const handleSkipRating = () => {
+    setShowRatingModal(false);
+    clearBooking();
+    router.replace("/home");
+  };
 
   const handleCancel = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -753,12 +774,13 @@ export default function ParcelConfirmedScreen() {
                     <View style={styles.driverPhotoNew}>
                       <Ionicons name="person" size={32} color="#9CA3AF" />
                     </View>
-                    <View style={styles.ratingBadgeNew}>
+                    <View style={[styles.ratingBadgeNew, { flexDirection: 'row', gap: 4, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2 }]}>
                       <Ionicons name="star" size={10} color={Colors.dark} />
-                      <Text style={styles.ratingTextNew}>{driverDetails?.rating || "4.8"}</Text>
+                      <Text style={styles.ratingTextNew}>{driverDetails?.rating ? driverDetails.rating.toFixed(1) : "New"}</Text>
+                      <Text style={[styles.ratingTextNew, { opacity: 0.6 }]}> | {driverDetails?.rideCount || 0} rides</Text>
                     </View>
                   </View>
-                  <Text style={styles.driverNameNew}>{driverDetails?.name?.toUpperCase() || "P KURUMURTHI"}</Text>
+                  <Text style={styles.driverNameNew}>{driverDetails?.name?.toUpperCase() || "DRIVER"}</Text>
                 </View>
 
                 <View style={styles.vehicleImgBoxNew}>
@@ -846,6 +868,13 @@ export default function ParcelConfirmedScreen() {
         onClose={() => setChatVisible(false)} 
         targetId={driverDetails?.id || 'driver'} 
         driverName={driverDetails?.name} 
+      />
+
+      <RatingModal
+        visible={showRatingModal}
+        driverName={driverDetails?.name || "Driver"}
+        onSubmit={handleSubmitRating}
+        onSkip={handleSkipRating}
       />
 
       {shareVisible && (

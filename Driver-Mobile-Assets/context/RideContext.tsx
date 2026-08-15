@@ -52,6 +52,8 @@ interface RideContextValue {
   completeRide: () => void;
   todayEarnings: number;
   completedRides: CompletedRide[];
+  setTodayEarnings: (val: number) => void;
+  setCompletedRides: (rides: CompletedRide[]) => void;
   loadRides: () => Promise<void>;
 }
 
@@ -192,15 +194,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
     isOnDuty, setIsOnDuty,
     incomingRide, setIncomingRide,
     showRidePopup, setShowRidePopup,
-    activeRide, activeRideStep,
+    activeRide, activeRideStep, setActiveRideStep,
     acceptRide, syncRide, rejectRide, advanceRideStep, completeRide,
-    todayEarnings, completedRides, loadRides,
+    todayEarnings, setTodayEarnings,
+    completedRides, setCompletedRides,
+    loadRides,
   }), [
     isOnDuty,
     incomingRide,
     showRidePopup,
     activeRide,
     activeRideStep,
+    setActiveRideStep,
     acceptRide,
     syncRide,
     rejectRide,

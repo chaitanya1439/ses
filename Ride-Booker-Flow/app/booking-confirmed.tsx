@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
 import { useBooking } from "@/contexts/BookingContext";
 import { useSocket } from "@/contexts/SocketContext";
+import RatingModal from "@/components/RatingModal";
 import ChatModal from "@/components/ChatModal";
 import ShareTripModal from "@/components/ShareTripModal";
 import { mockDriver, vehicleOptions } from "@/constants/mockData";
@@ -80,6 +81,7 @@ export default function BookingConfirmedScreen() {
     name: string;
     phone?: string;
     rating: number;
+    rideCount?: number;
     plateNumber: string;
     otp: string;
     lat?: number;
@@ -89,7 +91,8 @@ export default function BookingConfirmedScreen() {
       id: initPayload.driverId || 'driver',
       name: initPayload.driverName || "Your Driver",
       phone: initPayload.driverPhone || '',
-      rating: initPayload.rating || 4.9,
+      rating: initPayload.driverRating || 0,
+      rideCount: initPayload.driverRideCount || 0,
       plateNumber: initPayload.vehicleNumber || initPayload.plate || "TG 09 A 1234",
       otp: initPayload.otp || "1234",
       lat: initPayload.driverLat,
@@ -133,6 +136,7 @@ export default function BookingConfirmedScreen() {
   const lastRerouteTimeRef = useRef(0); // timestamp of last Directions API reroute call
   const [chatVisible, setChatVisible] = useState(false);
   const [shareVisible, setShareVisible] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   useEffect(() => {
     isOtpVerifiedRef.current = isOtpVerified;
@@ -335,7 +339,8 @@ export default function BookingConfirmedScreen() {
           id: payload.driverId || 'driver',
           name: payload.driverName || "Your Driver",
           phone: payload.driverPhone || '',
-          rating: payload.rating || 4.9,
+          rating: payload.driverRating || 0,
+          rideCount: payload.driverRideCount || 0,
           plateNumber: payload.vehicleNumber || payload.plate || "TG 09 A 1234",
           otp: payload.otp || "1234",
           lat: payload.driverLat,
@@ -418,11 +423,10 @@ export default function BookingConfirmedScreen() {
           useNativeDriver: false,
         }).start();
         
-        // Give them a moment to see the completed state, then redirect
+        // Show rating modal after 1.5s
         setTimeout(() => {
-          clearBooking();
-          router.replace("/home");
-        }, 3000);
+          setShowRatingModal(true);
+        }, 1500);
       } else if (payload.status === 'cancelled') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         alert("Ride was cancelled by the driver.");
@@ -438,6 +442,23 @@ export default function BookingConfirmedScreen() {
   }, [clearBooking, isConfirmed, progressAnim, subscribe, selectedVehicle]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
+
+  const handleSubmitRating = (rating: number) => {
+    sendMessage("submit_feedback", { 
+      tripId: initPayload?.tripId || "trip-123", 
+      toUserId: driverDetails?.id, 
+      rating 
+    });
+    setShowRatingModal(false);
+    clearBooking();
+    router.replace("/home");
+  };
+
+  const handleSkipRating = () => {
+    setShowRatingModal(false);
+    clearBooking();
+    router.replace("/home");
+  };
 
   const handleCancel = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -675,12 +696,13 @@ export default function BookingConfirmedScreen() {
                     <View style={styles.driverPhotoNew}>
                       <Ionicons name="person" size={32} color="#9CA3AF" />
                     </View>
-                    <View style={styles.ratingBadgeNew}>
+                    <View style={[styles.ratingBadgeNew, { flexDirection: 'row', gap: 4, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2 }]}>
                       <Ionicons name="star" size={10} color={Colors.dark} />
-                      <Text style={styles.ratingTextNew}>{driverDetails?.rating || "4.8"}</Text>
+                      <Text style={styles.ratingTextNew}>{driverDetails?.rating ? driverDetails.rating.toFixed(1) : "New"}</Text>
+                      <Text style={[styles.ratingTextNew, { opacity: 0.6 }]}> | {driverDetails?.rideCount || 0} rides</Text>
                     </View>
                   </View>
-                  <Text style={styles.driverNameNew}>{driverDetails?.name?.toUpperCase() || "P KURUMURTHI"}</Text>
+                  <Text style={styles.driverNameNew}>{driverDetails?.name?.toUpperCase() || "DRIVER"}</Text>
                 </View>
 
                 <View style={styles.vehicleImgBoxNew}>
@@ -772,6 +794,13 @@ export default function BookingConfirmedScreen() {
         onClose={() => setChatVisible(false)} 
         targetId={driverDetails?.id || 'driver'} 
         driverName={driverDetails?.name} 
+      />
+
+      <RatingModal
+        visible={showRatingModal}
+        driverName={driverDetails?.name || "Driver"}
+        onSubmit={handleSubmitRating}
+        onSkip={handleSkipRating}
       />
 
       {shareVisible && (

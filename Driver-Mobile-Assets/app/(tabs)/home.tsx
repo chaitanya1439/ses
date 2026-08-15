@@ -30,7 +30,7 @@ export default function HomeScreen() {
   const {
     isOnDuty, setIsOnDuty,
     setIncomingRide, setShowRidePopup,
-    todayEarnings, completedRides, loadRides,
+    todayEarnings, setTodayEarnings, completedRides, loadRides,
     syncRide,
     activeRide,
   } = useRide();
@@ -156,6 +156,30 @@ export default function HomeScreen() {
   useEffect(() => {
     loadRides();
   }, [loadRides]);
+
+  useEffect(() => {
+    if (!driver?.id) return;
+    
+    const fetchDriverStats = async () => {
+      try {
+        const { getPublicApiBaseUrl } = require('@/constants/config');
+        const res = await fetch(`${getPublicApiBaseUrl()}/api/driver/stats/${driver.id}`);
+        if (res.ok) {
+          const stats = await res.json();
+          setTodayEarnings(stats.todayEarnings);
+          // Update driver subscription locally for UI
+          if (driver) {
+             driver.subscriptionStatus = stats.subscriptionStatus;
+             driver.subscriptionExpiryDate = stats.subscriptionExpiry;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch driver stats:', e);
+      }
+    };
+
+    fetchDriverStats();
+  }, [driver?.id, setTodayEarnings]);
 
   // Show night fare modal when going on duty
   useEffect(() => {
