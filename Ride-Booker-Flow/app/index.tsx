@@ -1,13 +1,11 @@
 import React, { useEffect } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   StatusBar,
   Image,
 } from "react-native";
 import { router } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -20,7 +18,7 @@ import { Colors } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function SplashScreen() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0);
 
@@ -46,7 +44,12 @@ export default function SplashScreen() {
     const timer = setTimeout(() => {
       if (!isLoading) {
         if (isAuthenticated) {
-          router.replace("/home");
+          // Check if profile is complete (has name)
+          if (!user?.name || user.name.trim() === '') {
+            router.replace("/update-profile" as any);
+          } else {
+            router.replace("/home");
+          }
         } else {
           router.replace("/login");
         }
@@ -54,7 +57,7 @@ export default function SplashScreen() {
     }, 2200);
 
     return () => clearTimeout(timer);
-  }, [isAuthenticated, isLoading, opacity, scale]);
+  }, [isAuthenticated, isLoading, opacity, scale, user]);
 
   return (
     <View style={styles.container}>
@@ -64,10 +67,6 @@ export default function SplashScreen() {
           source={require('@/assets/images/logo.png')} 
           style={{ width: 150, height: 150, resizeMode: 'contain' }} 
         />
-        <Text style={styles.appName}>
-          M<Text style={{color: '#EF4444'}}>!</Text> tr<Text style={{color: '#F59E0B'}}>!</Text>p
-        </Text>
-        <Text style={styles.tagline}>Your ride, your way</Text>
       </Animated.View>
     </View>
   );
@@ -82,20 +81,5 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: "center",
-    gap: 12,
-  },
-  appName: {
-    fontSize: 40,
-    fontFamily: "Poppins_700Bold",
-    color: "#2563EB",
-    letterSpacing: -1,
-    marginTop: 8,
-  },
-  tagline: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
-    color: Colors.dark,
-    opacity: 0.7,
-    letterSpacing: 0.5,
   },
 });
