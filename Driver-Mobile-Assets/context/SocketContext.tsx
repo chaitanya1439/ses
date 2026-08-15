@@ -74,6 +74,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
   }, []);
 
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isComponentMounted = useRef(true);
 
   const connect = useCallback(() => {
@@ -96,6 +97,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
+      pingIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 25000);
       
       let deviceId = 'unknown';
       try {
@@ -127,6 +136,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
       console.log(`[WS] Disconnected`);
       setIsConnected(false);
       wsRef.current = null;
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
       
       if (isComponentMounted.current && token && userId) {
         console.log(`[WS] Attempting to reconnect in 3s...`);
@@ -149,6 +162,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
       isComponentMounted.current = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
       }
       if (wsRef.current) {
         wsRef.current.close();
