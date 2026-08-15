@@ -84,7 +84,7 @@ export default function LoginScreen() {
       }
 
       // Store the JWT token and login
-      await login(fullPhone, data.token);
+      await login(fullPhone, data.token, data.id);
       
       // Route based on user existence
       if (data.isNewUser) {

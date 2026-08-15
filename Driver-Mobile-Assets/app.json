@@ -32,7 +32,7 @@
       },
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/logo.png"
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "usesCleartextTraffic": true,
       "permissions": [

@@ -50,7 +50,7 @@ interface AuthContextValue {
   driver: Driver | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (phone: string, token?: string) => Promise<void>;
+  login: (phone: string, token?: string, id?: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<void>;
   verifyOTP: (code: string, phone: string) => Promise<void>;
   register: (data: Omit<Driver, 'id' | 'rating' | 'totalRides' | 'hoursOnline' | 'earningsThisMonth' | 'token' | 'isVerified' | 'verifiedDocuments'>) => Promise<void>;
@@ -97,8 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const login = async (phone: string, token?: string) => {
-    const d = { ...DEFAULT_DRIVER, phone, token: token || DEFAULT_DRIVER.token };
+  const login = async (phone: string, token?: string, id?: string) => {
+    const d = { 
+      ...DEFAULT_DRIVER, 
+      phone, 
+      token: token || DEFAULT_DRIVER.token,
+      ...(id ? { id } : {})
+    };
     await AsyncStorage.setItem('driver_session', JSON.stringify(d));
     setDriver(d);
   };
@@ -128,16 +133,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: Omit<Driver, 'id' | 'rating' | 'totalRides' | 'hoursOnline' | 'earningsThisMonth' | 'token' | 'isVerified' | 'verifiedDocuments'>) => {
+    // If we have an existing ID (e.g. they logged in and we assigned one), use it. Else generate a temp one.
+    const idToUse = driver?.id || 'temp-' + Date.now().toString();
     const d: Driver = {
       ...data,
-      id: 'ffe12862-83d8-468b-8c56-1481cf18b818',
+      id: idToUse,
       rating: 0,
       totalRides: 0,
       hoursOnline: 0,
       earningsThisMonth: 0,
       isVerified: false,
       verifiedDocuments: {},
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmZmUxMjg2Mi04M2Q4LTQ2OGItOGM1Ni0xNDgxY2YxOGI4MTgiLCJpYXQiOjE3NjEyMTg3MjUsImV4cCI6MTc2MTgyMzUyNX0.Ny5Gt3TFZvX-mLpBdQJ8nWR0rqIbQGpXPGrcEWWNlVs'
+      token: driver?.token || ''
     };
     await AsyncStorage.setItem('driver_session', JSON.stringify(d));
     setDriver(d);
