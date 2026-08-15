@@ -23,7 +23,7 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (phone: string, token?: string, id?: string) => Promise<void>;
+  login: (phone: string, token?: string, id?: string, userData?: any) => Promise<void>;
   register: (name: string, phone: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
@@ -72,14 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = async (phone: string, token?: string, id?: string) => {
+  const login = async (phone: string, token?: string, id?: string, userData?: any) => {
     const newUser: User = {
       id: id || "temp-" + Date.now().toString(),
-      name: "Chaitanya Vellanki", // Ideally this should come from backend or profile
+      name: userData?.name || "", 
       phone,
-      email: "chaitanya@email.com",
+      email: userData?.email || "",
+      gender: userData?.gender || "",
       rating: 4.9,
-      token: token || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      token: token || ""
     };
     await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(newUser));
     setUser(newUser);

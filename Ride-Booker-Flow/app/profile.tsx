@@ -34,6 +34,20 @@ interface MenuItem {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const [stats, setStats] = React.useState({ rides: 0, saved: 0, parcels: 0 });
+
+  React.useEffect(() => {
+    if (user?.id) {
+      fetch(`https://real.shelteric.com/api/rider/stats/${user.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.stats) {
+            setStats(data.stats);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [user?.id]);
 
   const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
@@ -175,17 +189,17 @@ export default function ProfileScreen() {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statValue}>{stats.rides}</Text>
             <Text style={styles.statLabel}>Rides</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>₹1,240</Text>
+            <Text style={styles.statValue}>₹{stats.saved}</Text>
             <Text style={styles.statLabel}>Saved</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>8</Text>
+            <Text style={styles.statValue}>{stats.parcels}</Text>
             <Text style={styles.statLabel}>Parcels</Text>
           </View>
         </View>
