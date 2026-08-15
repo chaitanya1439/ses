@@ -153,6 +153,7 @@ export default function DriverScannerScreen() {
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [manualError, setManualError] = useState("");
+  const inputRef = useRef<import("react-native").TextInput>(null);
   const [retryCount, setRetryCount] = useState(0);
   const scanLockRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -521,7 +522,7 @@ export default function DriverScannerScreen() {
               Ask the rider for their 4-digit code shown below the QR
             </Text>
 
-            <View style={s.modalInputRow}>
+            <Pressable style={s.modalInputRow} onPress={() => inputRef.current?.focus()}>
               {[0, 1, 2, 3].map((i) => (
                 <View
                   key={i}
@@ -536,10 +537,11 @@ export default function DriverScannerScreen() {
                   </Text>
                 </View>
               ))}
-            </View>
+            </Pressable>
 
             {/* Hidden TextInput to capture keyboard */}
             <TextInput
+              ref={inputRef}
               style={s.hiddenInput}
               value={manualCode}
               onChangeText={(text) => {
@@ -950,9 +952,10 @@ const s = StyleSheet.create({
   },
   hiddenInput: {
     position: "absolute",
-    opacity: 0,
-    width: 1,
-    height: 1,
+    opacity: 0.01,
+    width: "100%",
+    height: "100%",
+    zIndex: -1,
   },
   modalError: {
     fontSize: 12,

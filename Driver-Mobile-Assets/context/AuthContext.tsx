@@ -98,14 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (phone: string, token?: string, id?: string) => {
-    const d = { 
-      ...DEFAULT_DRIVER, 
-      phone, 
+    const newDriver: Driver = {
+      ...DEFAULT_DRIVER,
+      phone,
       token: token || DEFAULT_DRIVER.token,
-      ...(id ? { id } : {})
+      id: id || `temp-${Date.now()}`,
     };
-    await AsyncStorage.setItem('driver_session', JSON.stringify(d));
-    setDriver(d);
+    await AsyncStorage.setItem('driver_session', JSON.stringify(newDriver));
+    setDriver(newDriver);
   };
 
   const requestOTP = async (phone: string) => {

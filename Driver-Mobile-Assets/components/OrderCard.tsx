@@ -14,7 +14,7 @@ export function OrderCard({ ride }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.rideId}>{ride.id}</Text>
+        <Text style={styles.rideId}>{(ride as any).customerName || (ride as any).riderName || 'Ride'}</Text>
         <View style={[styles.badge, { backgroundColor: isCompleted ? theme.colors.successLight : theme.colors.dangerLight }]}>
           <Text style={[styles.badgeText, { color: isCompleted ? theme.colors.success : theme.colors.danger }]}>
             {isCompleted ? 'Completed' : 'Cancelled'}
