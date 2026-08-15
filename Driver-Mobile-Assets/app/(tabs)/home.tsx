@@ -544,7 +544,7 @@ export default function HomeScreen() {
               >
                 <MaterialCommunityIcons name="qrcode-scan" size={28} color={theme.colors.primary} />
                 <Text style={[styles.quickActionValue, { color: theme.colors.primary }]}>Scan QR</Text>
-                <Text style={styles.quickActionLabel}>Swift Ride</Text>
+                <Text style={styles.quickActionLabel}>Tatkal Ride</Text>
               </Pressable>
             </View>
           </View>

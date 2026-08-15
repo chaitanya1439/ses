@@ -74,7 +74,7 @@ export default function CustomerQRScreen() {
   const qrPayload = useMemo(
     () =>
       JSON.stringify({
-        type: "swift_ride",
+        type: "tatkal_ride",
         bookingId,
         riderId: user?.id || "anonymous",
         code: fallbackCode,
@@ -119,7 +119,7 @@ export default function CustomerQRScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const unsub = subscribe("swift_ride_started", (payload: any) => {
+    const unsub = subscribe("tatkal_ride_started", (payload: any) => {
       if (payload?.bookingId === bookingId || payload?.code === fallbackCode) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setRideStarted(true);
@@ -213,7 +213,7 @@ export default function CustomerQRScreen() {
         <View style={s.instructionRow}>
         <MaterialCommunityIcons name="qrcode-scan" size={20} color={Colors.accent} />
         <Text style={s.instructionText}>
-          Let the driver scan this QR code to start your Swift ride
+          Let the driver scan this QR code to start your Tatkal ride
         </Text>
       </View>
 

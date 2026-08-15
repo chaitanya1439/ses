@@ -71,7 +71,7 @@ function RootLayoutNav() {
       <Stack.Screen name="review-delivery" />
       <Stack.Screen name="parcel-confirmed" />
       <Stack.Screen name="my-rides" />
-      <Stack.Screen name="swift-ride" />
+      <Stack.Screen name="tatkal-ride" />
     </Stack>
   );
 }

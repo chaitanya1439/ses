@@ -28,7 +28,7 @@ interface ServiceItem {
 
 const SERVICES_ROW_1: ServiceItem[] = [
   { id: "bike", label: "Bike", customImage: require("@/assets/images/bike-saver.png"), promo: "₹2", route: "/book-ride" },
-  { id: "swift", label: "Swift", icon: "qrcode-scan", iconSet: "MaterialCommunityIcons", route: "/swift-ride/customer-qr" },
+  { id: "tatkal", label: "Tatkal", icon: "qrcode-scan", iconSet: "MaterialCommunityIcons", route: "/tatkal-ride/customer-qr" },
   { id: "parcel", label: "Parcel", icon: "cube", iconSet: "Ionicons", route: "/parcel-locations" },
   { id: "she-bike", label: "She Bike", customImage: require("@/assets/images/she-bike-icon.png"), route: "/book-ride" },
 ];
