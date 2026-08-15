@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -36,6 +37,19 @@ const MENU_ITEMS: MenuItem[] = [
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { driver, logout } = useAuth();
+  
+  const [stats, setStats] = React.useState({ rating: 0, orders: 0, years: '0.0', dob: null, languages: null, profileImageUrl: null });
+
+  React.useEffect(() => {
+    if (driver?.id) {
+      fetch(`https://real.shelteric.com/api/driver/stats/${driver.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.stats) setStats(data.stats);
+        })
+        .catch(console.error);
+    }
+  }, [driver?.id]);
 
   const topPad = Platform.OS === 'web' ? insets.top + 67 : insets.top;
 
@@ -53,16 +67,10 @@ export default function ProfileScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#1A1A2E" />
           </Pressable>
-          <Text style={styles.topBarTitle}>My Profile</Text>
+          <Text style={styles.topBarTitle}>Profile</Text>
         </View>
-
-        <Pressable
-          style={styles.helpPill}
-          onPress={() =>
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-          }
-        >
-          <Text style={styles.helpPillText}>🎧 Help</Text>
+        <Pressable style={styles.helpPill}>
+          <Text style={styles.helpPillText}>Help</Text>
         </Pressable>
       </View>
 
@@ -71,32 +79,24 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 32 },
+          { paddingBottom: insets.bottom + 80 },
         ]}
       >
         {/* Hero Banner */}
         <IndianCityscapeBanner />
 
-        {/* Avatar + Name */}
+        {/* ─── AVATAR & NAME ─── */}
         <View style={styles.avatarWrapper}>
           <View style={styles.avatarCircle}>
-            {driver?.avatar ? (
-              <View style={styles.avatarImgWrap}>
-                {/* If a real URI comes in, swap for <Image> */}
-                <MaterialCommunityIcons
-                  name="account"
-                  size={52}
-                  color="#9CA3AF"
-                />
-              </View>
+            {stats.profileImageUrl ? (
+              <Image source={{ uri: stats.profileImageUrl }} style={styles.avatarImgWrap} />
             ) : (
-              <MaterialCommunityIcons
-                name="account"
-                size={52}
-                color="#9CA3AF"
-              />
+              <Ionicons name="person" size={50} color="#9CA3AF" />
             )}
           </View>
+          <Pressable style={styles.editBadge}>
+            <Ionicons name="pencil" size={14} color="#FFFFFF" />
+          </Pressable>
         </View>
 
         <Text style={styles.driverName}>
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
           <Pressable style={styles.statItem}>
             <View style={styles.statValueRow}>
               <Text style={styles.statValue}>
-                {driver?.rating ? driver.rating.toFixed(1) : '--'}
+                {stats.rating.toFixed(1)}
               </Text>
               <Text style={styles.starIcon}> ★</Text>
             </View>
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
           {/* Orders */}
           <View style={styles.statItem}>
             <Text style={styles.statValue}>
-              {driver?.totalRides ?? 726}
+              {stats.orders}
             </Text>
             <Text style={styles.statLabel}>ORDERS</Text>
           </View>
@@ -130,7 +130,7 @@ export default function ProfileScreen() {
 
           {/* Years */}
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>3.0</Text>
+            <Text style={styles.statValue}>{stats.years}</Text>
             <Text style={styles.statLabel}>YEARS</Text>
           </View>
         </View>
@@ -269,6 +269,16 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#374151',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   driverName: {
     textAlign: 'center',
