@@ -515,7 +515,7 @@ export default function HomeScreen() {
                 style={styles.quickActionCard}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/rider-mode' as any);
+                  router.push('/rider-search' as any);
                 }}
               >
                 <MaterialCommunityIcons name="car-sports" size={28} color="#FF9800" />

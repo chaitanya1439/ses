@@ -9,6 +9,7 @@ import { queryClient } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { RideProvider } from "@/context/RideContext";
 import { SocketProvider, useSocket } from "@/context/SocketContext";
+import { RiderModeProvider } from "@/context/RiderModeContext";
 import { RideRequestPopup } from "@/components/RideRequestPopup";
 import {
   useFonts,
@@ -92,7 +93,9 @@ function SocketWrapper({ children }: { children: React.ReactNode }) {
       vehicleType={driver.vehicleType}
       onForceLogout={handleForceLogout}
     >
-      {children}
+      <RiderModeProvider>
+        {children}
+      </RiderModeProvider>
     </SocketProvider>
   );
 }
