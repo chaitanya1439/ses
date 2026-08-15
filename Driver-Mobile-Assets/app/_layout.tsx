@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { RideProvider } from "@/context/RideContext";
-import { SocketProvider } from "@/context/SocketContext";
+import { SocketProvider, useSocket } from "@/context/SocketContext";
 import { RideRequestPopup } from "@/components/RideRequestPopup";
 import {
   useFonts,
@@ -21,12 +21,25 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
+  const { subscribe } = useSocket();
+
+  useEffect(() => {
+    const unsub = subscribe("ride_accepted", (payload: any) => {
+      console.log(`[Rider Mode] ride_accepted received, navigating to rider-booking-confirmed`);
+      router.push({
+        pathname: "/rider-booking-confirmed" as any,
+        params: { payload: JSON.stringify(payload) },
+      });
+    });
+    return () => unsub();
+  }, [subscribe]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="otp" />
-            <Stack.Screen name="permissions" />
+      <Stack.Screen name="permissions" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="active-ride" />
@@ -55,6 +68,7 @@ function RootLayoutNav() {
       <Stack.Screen name="notification" />
       <Stack.Screen name="go-to-area" />
       <Stack.Screen name="driver-scanner" />
+      <Stack.Screen name="rider-booking-confirmed" />
     </Stack>
   );
 }
