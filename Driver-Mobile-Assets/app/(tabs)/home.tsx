@@ -262,7 +262,8 @@ export default function HomeScreen() {
           id: `R${Date.now()}`,
           customer: {
             id: payload.riderId || `C${Date.now()}`,
-            name: payload.driverName || 'Rider', // Note: backend sends driverName for rider, but we need rider name. Using default.
+            name: payload.riderName || 'Rider',
+            phone: payload.riderPhone || '',
             rating: 4.8,
           },
           pickup: {

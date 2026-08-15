@@ -11,6 +11,7 @@ import {
   Image,
   Animated as RNAnimated,
   Alert,
+  Linking,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -77,6 +78,7 @@ export default function BookingConfirmedScreen() {
   const [driverDetails, setDriverDetails] = useState<{
     id?: string;
     name: string;
+    phone?: string;
     rating: number;
     plateNumber: string;
     otp: string;
@@ -86,8 +88,9 @@ export default function BookingConfirmedScreen() {
     initPayload ? {
       id: initPayload.driverId || initPayload.driverName || 'driver',
       name: initPayload.driverName || (initPayload.driverId ? `Driver #${initPayload.driverId.substring(0,4)}` : "Your Driver"),
+      phone: initPayload.driverPhone || '',
       rating: initPayload.rating || 4.9,
-      plateNumber: initPayload.plate || "TG 09 A 1234",
+      plateNumber: initPayload.vehicleNumber || initPayload.plate || "TG 09 A 1234",
       otp: initPayload.otp || "1234",
       lat: initPayload.driverLat,
       lng: initPayload.driverLng,
@@ -331,8 +334,9 @@ export default function BookingConfirmedScreen() {
         setDriverDetails({
           id: payload.driverId || payload.driverName || 'driver',
           name: payload.driverName || (payload.driverId ? `Driver #${payload.driverId.substring(0,4)}` : "Your Driver"),
+          phone: payload.driverPhone || '',
           rating: payload.rating || 4.9,
-          plateNumber: payload.plate || "TG 09 A 1234",
+          plateNumber: payload.vehicleNumber || payload.plate || "TG 09 A 1234",
           otp: payload.otp || "1234",
           lat: payload.driverLat,
           lng: payload.driverLng,
@@ -417,7 +421,7 @@ export default function BookingConfirmedScreen() {
         // Give them a moment to see the completed state, then redirect
         setTimeout(() => {
           clearBooking();
-          router.replace("/rate-trip" as any);
+          router.replace("/home");
         }, 3000);
       } else if (payload.status === 'cancelled') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -715,7 +719,16 @@ export default function BookingConfirmedScreen() {
                   <Ionicons name="chatbubble-outline" size={18} color={Colors.white} />
                   <Text style={styles.msgBtnTextUber}>Message</Text>
                 </Pressable>
-                <Pressable style={styles.iconBtnUber}>
+                <Pressable 
+                  style={styles.iconBtnUber}
+                  onPress={() => {
+                    if (driverDetails?.phone) {
+                      Linking.openURL(`tel:${driverDetails.phone}`);
+                    } else {
+                      Alert.alert("Error", "Driver phone number not available.");
+                    }
+                  }}
+                >
                   <Ionicons name="call-outline" size={20} color={Colors.dark} />
                 </Pressable>
                 <Pressable 

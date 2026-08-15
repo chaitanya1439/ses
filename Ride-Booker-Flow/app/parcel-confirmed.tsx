@@ -11,6 +11,7 @@ import {
   Image,
   Animated as RNAnimated,
   Alert,
+  Linking,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -110,6 +111,7 @@ export default function ParcelConfirmedScreen() {
   const [driverDetails, setDriverDetails] = useState<{
     id?: string;
     name: string;
+    phone?: string;
     rating: number;
     plateNumber: string;
     otp: string;
@@ -120,8 +122,9 @@ export default function ParcelConfirmedScreen() {
     initPayload ? {
       id: initPayload.driverId || initPayload.driverName || 'driver',
       name: initPayload.driverName || (initPayload.driverId ? `Driver #${initPayload.driverId.substring(0,4)}` : "Your Driver"),
+      phone: initPayload.driverPhone || '',
       rating: initPayload.rating || 4.9,
-      plateNumber: initPayload.plate || "TG 09 A 1234",
+      plateNumber: initPayload.vehicleNumber || initPayload.plate || "TG 09 A 1234",
       otp: initPayload.otp || "1234",
       dropOtp: initPayload.dropOtp || "5678",
       lat: initPayload.driverLat,
@@ -390,8 +393,9 @@ export default function ParcelConfirmedScreen() {
         setDriverDetails({
           id: payload.driverId || payload.driverName || 'driver',
           name: payload.driverName || (payload.driverId ? `Driver #${payload.driverId.substring(0,4)}` : "Your Driver"),
+          phone: payload.driverPhone || '',
           rating: payload.rating || 4.9,
-          plateNumber: payload.plate || "TG 09 A 1234",
+          plateNumber: payload.vehicleNumber || payload.plate || "TG 09 A 1234",
           otp: payload.otp || "1234",
           dropOtp: payload.dropOtp || "5678",
           lat: payload.driverLat,
@@ -789,7 +793,16 @@ export default function ParcelConfirmedScreen() {
                   <Ionicons name="chatbubble-outline" size={18} color={Colors.white} />
                   <Text style={styles.msgBtnTextUber}>Message</Text>
                 </Pressable>
-                <Pressable style={styles.iconBtnUber}>
+                <Pressable 
+                  style={styles.iconBtnUber}
+                  onPress={() => {
+                    if (driverDetails?.phone) {
+                      Linking.openURL(`tel:${driverDetails.phone}`);
+                    } else {
+                      Alert.alert("Error", "Driver phone number not available.");
+                    }
+                  }}
+                >
                   <Ionicons name="call-outline" size={20} color={Colors.dark} />
                 </Pressable>
                 <Pressable 

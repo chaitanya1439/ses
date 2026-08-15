@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Platform, Alert
-, TextInput, KeyboardAvoidingView } from 'react-native';
+, TextInput, KeyboardAvoidingView, Linking } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -238,7 +238,18 @@ export default function ActiveRideScreen() {
             </View>
           </View>
           <View style={styles.contactActions}>
-            <Pressable style={[styles.contactBtn, { backgroundColor: '#ECFDF5' }]} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+            <Pressable 
+              style={[styles.contactBtn, { backgroundColor: '#ECFDF5' }]} 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const phone = (activeRide.customer as any)?.phone;
+                if (phone) {
+                  Linking.openURL(`tel:${phone}`);
+                } else {
+                  Alert.alert("Error", "Rider phone number not available.");
+                }
+              }}
+            >
               <Ionicons name="call" size={20} color="#10B981" />
             </Pressable>
             <Pressable style={[styles.contactBtn, { backgroundColor: '#EFF6FF' }]} onPress={() => {

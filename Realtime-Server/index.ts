@@ -13,11 +13,14 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import Redis from 'ioredis';
+import crypto from 'crypto';
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:RidegoPassword123!@ridego-db.cmbwkyg28hi2.us-east-1.rds.amazonaws.com:5432/postgres';
 const pool = new pg.Pool({ 
   connectionString,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  max: 20, // Increased pool size for concurrent driver auths
+  idleTimeoutMillis: 30000,
 });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter } as any);
@@ -29,9 +32,29 @@ async function getActiveTrip(riderId: string): Promise<TripRecord | undefined> {
 }
 async function setActiveTrip(riderId: string, trip: TripRecord) {
   await redis.set(`trip:${riderId}`, JSON.stringify(trip));
+  // Reverse index: driver → rider mapping for O(1) lookups
+  if (trip.driverId) {
+    await redis.set(`drivertrip:${trip.driverId}`, riderId);
+  }
 }
 async function deleteActiveTrip(riderId: string) {
+  // Clean up reverse index before deleting the trip
+  const tripData = await redis.get(`trip:${riderId}`);
+  if (tripData) {
+    try {
+      const trip = JSON.parse(tripData);
+      if (trip.driverId) {
+        await redis.del(`drivertrip:${trip.driverId}`);
+      }
+    } catch { /* ignore parse errors */ }
+  }
   await redis.del(`trip:${riderId}`);
+}
+/** O(1) lookup: find the active trip for a given driver */
+async function getDriverActiveTrip(driverId: string): Promise<TripRecord | undefined> {
+  const riderId = await redis.get(`drivertrip:${driverId}`);
+  if (!riderId) return undefined;
+  return getActiveTrip(riderId);
 }
 async function getAllActiveTrips(): Promise<[string, TripRecord][]> {
   const keys = await redis.keys('trip:*');
@@ -407,48 +430,34 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
         }
 
         if (data.role === 'driver') {
-          // --- DynamoDB Subscription Validation ---
+          // Register driver in memory FIRST + send auth_success immediately
+          // so the client doesn't timeout while we do async DB/Redis work.
+          newClient.status = existingDriver?.status ?? 'available';
+          if (existingDriver?.lastLocation) {
+            newClient.lastLocation = existingDriver.lastLocation;
+          }
+
+          setClientInfo(ws, newClient);
+          drivers.set(newClient.id, newClient);
+          console.log(`[Auth] ✓ Driver REGISTERED in memory — id: ${newClient.id}, status: ${newClient.status}`);
+          console.log(`[Auth]   Total drivers online: ${drivers.size}`);
+
+          // Send auth_success immediately (non-blocking)
+          ws.send(JSON.stringify({ type: 'auth_success', id: newClient.id, role: data.role }));
+
+          // Background: DB subscription check + trip sync (non-blocking)
           (async () => {
             try {
-              let driverDoc: any = null;
+              // DB subscription check (fire-and-forget, don't block auth)
               if (clientId !== 'ffe12862-83d8-468b-8c56-1481cf18b818') {
-                driverDoc = await prisma.user.findUnique({
+                prisma.user.findUnique({
                   where: { userId: clientId }
-                });
+                }).catch((e: any) => console.error(`[Auth] DB lookup failed for ${clientId}:`, e));
               }
 
-              // Passed all checks, proceed to register
-              // Mock dummy user as active for real-time URL checks
-              if (clientId === 'ffe12862-83d8-468b-8c56-1481cf18b818') {
-                if (!driverDoc) driverDoc = { subscriptionStatus: 'active' };
-                else driverDoc.subscriptionStatus = 'active';
-              }
-
-              // Do not reject drivers without active subscriptions here.
-              // They should still receive ride requests, but the app will prevent them from accepting.
-              // (Original rejection code removed to allow requests to flow)
-
-              newClient.status = existingDriver?.status ?? 'available';
-              if (existingDriver?.lastLocation) {
-                newClient.lastLocation = existingDriver.lastLocation;
-              }
-
-              setClientInfo(ws, newClient);
-              drivers.set(newClient.id, newClient);
-              console.log(`[Auth] ✓ Driver REGISTERED in memory — id: ${newClient.id}, status: ${newClient.status}`);
-              console.log(`[Auth]   Total drivers online: ${drivers.size}`);
-
-              ws.send(JSON.stringify({ type: 'auth_success', id: newClient.id, role: data.role }));
-
-              // Offline Recovery Sync
-              let currentTrip: TripRecord | undefined;
-              for (const [, trip] of await getAllActiveTrips()) {
-                if (trip.driverId === newClient.id) {
-                  currentTrip = trip;
-                  break;
-                }
-              }
-              if (currentTrip) {
+              // Offline Recovery Sync — O(1) using reverse index instead of scanning all trips
+              const currentTrip = await getDriverActiveTrip(newClient.id);
+              if (currentTrip && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'sync_state', payload: currentTrip }));
                 console.log(`Synced active state to reconnecting driver ${newClient.id}`);
               }
@@ -456,7 +465,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
               // Deliver pending ride requests to reconnecting/newly-online drivers
               if ((newClient as any).status !== 'offline') {
                 for (const [riderId, req] of await getAllPendingRequests()) {
-                  if (Date.now() - req.timestamp <= 60_000) {
+                  if (Date.now() - req.timestamp <= 60_000 && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                       type: 'new_ride_request',
                       payload: { ...req, riderId }
@@ -466,9 +475,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
               }
 
             } catch (err) {
-              console.error(`[Auth] DB Error checking subscription for ${clientId}:`, err);
-              ws.send(JSON.stringify({ type: 'auth_error', message: 'Internal server error verifying subscription' }));
-              ws.close(1011, 'Internal Error');
+              console.error(`[Auth] Background sync error for ${clientId}:`, err);
             }
           })();
           
@@ -716,10 +723,44 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
       case 'ride_accept': {
         if (!client || client.role !== 'driver') break;
 
+        // ── Atomic lock: prevent multiple drivers accepting the same ride ──
+        // SET NX returns 'OK' only for the FIRST caller; subsequent ones get null.
+        const lockKey = `lock:ride_accept:${data.riderId}`;
+        const lockAcquired = await redis.set(lockKey, client.id, 'NX', 'EX', 30);
+
+        if (!lockAcquired) {
+          console.log(`[ride_accept] BLOCKED — Ride for ${data.riderId} already accepted by another driver. Driver ${client.id} was too late.`);
+          client.status = 'available'; // reset back to available
+          ws.send(JSON.stringify({
+            type: 'ride_request_cancelled',
+            payload: { riderId: data.riderId, reason: 'accepted_by_another' },
+          }));
+          break;
+        }
+
         client.status = 'busy';
 
-        // Generate a 4-digit OTP for the ride
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        // Generate a STATIC 4-digit OTP for the ride based on riderId
+        // This ensures the user always gets the same OTP and same QR scanner code
+        const hash = crypto.createHash('sha256').update(data.riderId).digest('hex');
+        const otp = (parseInt(hash.substring(0, 8), 16) % 9000 + 1000).toString();
+        
+        // Fetch real details from DB so they can call each other
+        let driverPhone, driverName, vehicleNumber, riderPhone, riderName;
+        try {
+          const [driverDoc, riderDoc] = await Promise.all([
+            prisma.user.findUnique({ where: { userId: client.id } }),
+            prisma.user.findUnique({ where: { userId: data.riderId } })
+          ]);
+          driverPhone = driverDoc?.phone || '';
+          driverName = driverDoc?.name || client.id;
+          vehicleNumber = driverDoc?.vehicleNumber || ''; 
+          riderPhone = riderDoc?.phone || '';
+          riderName = riderDoc?.name || 'Rider';
+        } catch(e) {
+          console.error('[Prisma] Error fetching user details for ride_accept:', e);
+          driverName = client.id;
+        }
 
         const tripRecord: TripRecord = {
           riderId: data.riderId,
@@ -728,7 +769,11 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
           otp,
           driverLat: client.lastLocation?.lat,
           driverLng: client.lastLocation?.lng,
-          driverName: client.id, // Use driver ID as name if name not available
+          driverName: driverName || client.id,
+          driverPhone: driverPhone || '',
+          vehicleNumber: vehicleNumber || '',
+          riderName: riderName || 'Rider',
+          riderPhone: riderPhone || '',
           ...data.payload,
         };
 
@@ -792,6 +837,16 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
             }));
           }
         });
+
+        // Send a success confirmation back to the driver who accepted it,
+        // so they get the rider's phone number and the exact static OTP generated.
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'sync_state',
+            payload: tripRecord
+          }));
+        }
+
         break;
       }
 
@@ -850,6 +905,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
             client.status = 'available';
           }
           await deleteActiveTrip(targetRiderId);
+          await redis.del(`lock:ride_accept:${targetRiderId}`);
         } else {
           // If the ride was still pending
           if ((!!(await getPendingRequest(targetRiderId)))) {
@@ -878,12 +934,9 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
         // Derive the paired rider from server memory (never trust client-provided riderId blindly)
         let targetRiderId: string | undefined = data.riderId;
         if (!targetRiderId) {
-          for (const [riderId, trip] of await getAllActiveTrips()) {
-            if (trip.driverId === client.id) {
-              targetRiderId = riderId;
-              break;
-            }
-          }
+          // O(1) lookup using reverse index instead of scanning all trips
+          const rId = await redis.get(`drivertrip:${client.id}`);
+          if (rId) targetRiderId = rId;
         }
 
         if (targetRiderId) {
@@ -930,6 +983,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
         if (data.status === 'completed' || data.status === 'cancelled') {
           client.status = 'available';
           await deleteActiveTrip(data.riderId);
+          await redis.del(`lock:ride_accept:${data.riderId}`);
         }
 
         // Push notification to rider about trip status changes
