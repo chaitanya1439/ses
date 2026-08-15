@@ -437,7 +437,7 @@ export default function HomeScreen() {
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.promoTitle}>Subscription Active!</Text>
+                      <Text style={styles.promoTitle}>Active: {driver?.subscriptionPlanId ? driver.subscriptionPlanId.charAt(0).toUpperCase() + driver.subscriptionPlanId.slice(1) : 'Premium'} Plan</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                         <MaterialCommunityIcons name="clock-outline" size={14} color="#81C784" />
                         <Text style={{ color: '#81C784', fontSize: 13, fontFamily: 'Poppins_600SemiBold' }}>
@@ -503,12 +503,24 @@ export default function HomeScreen() {
                 style={styles.quickActionCard}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/active-ride');
+                  router.push('/performance' as any);
                 }}
               >
-                <MaterialCommunityIcons name="road-variant" size={28} color={theme.colors.primary} />
-                <Text style={styles.quickActionValue}>{todayRides}</Text>
-                <Text style={styles.quickActionLabel}>Completed</Text>
+                <MaterialCommunityIcons name="chart-line" size={28} color={theme.colors.success} />
+                <Text style={styles.quickActionValue}>98%</Text>
+                <Text style={styles.quickActionLabel}>Performance</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.quickActionCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/rider-mode' as any);
+                }}
+              >
+                <MaterialCommunityIcons name="car-sports" size={28} color="#FF9800" />
+                <Text style={[styles.quickActionValue, { color: '#FF9800' }]}>Rider</Text>
+                <Text style={styles.quickActionLabel}>Book Ride</Text>
               </Pressable>
 
               <Pressable

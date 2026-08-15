@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,8 +7,13 @@ import { theme } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 import { HomeMap } from '@/components/HomeMap';
 
+import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
+
 export default function RiderModeScreen() {
   const insets = useSafeAreaInsets();
+  const { sendThrottledMessage } = useSocket();
+  const { driver } = useAuth();
   const [pickup, setPickup] = useState('Current Location');
   const [dropoff, setDropoff] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -23,13 +28,24 @@ export default function RiderModeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSearching(true);
     
-    // Simulate finding a ride
+    // Send actual ride request
+    const fare = selectedVehicle === 'Auto' ? 45 : 25;
+    sendThrottledMessage('ride_request', {
+      pickupLocation: { lat: 17.4482, lng: 78.3914 }, // Mock coordinates for now
+      pickupAddress: pickup,
+      dropAddress: dropoff,
+      vehicle: selectedVehicle.toLowerCase(),
+      fare: fare,
+      distance: 3.2,
+      riderName: driver?.name || 'Driver (Rider Mode)',
+    });
+
     setTimeout(() => {
       setIsSearching(false);
-      Alert.alert('Ride Booked!', `A ${selectedVehicle} Captain is on their way.`, [
+      Alert.alert('Ride Requested!', `Searching for a nearby ${selectedVehicle} Captain...`, [
         { text: 'OK', onPress: () => router.back() }
       ]);
-    }, 3000);
+    }, 1500);
   };
 
   return (
@@ -98,7 +114,7 @@ export default function RiderModeScreen() {
                 style={[styles.rideOptionActive, selectedVehicle !== 'Auto' && { backgroundColor: 'transparent', borderColor: '#E5E7EB', borderWidth: 1 }]}
                 onPress={() => setSelectedVehicle('Auto')}
               >
-                <MaterialIcons name="local-taxi" size={32} color="#1A1A2E" />
+                <Image source={require('@/assets/images/auto-logo.png')} style={{ width: 44, height: 44, resizeMode: 'contain' }} />
                 <View style={styles.rideOptionInfo}>
                   <Text style={styles.rideOptionName}>Auto</Text>
                   <Text style={styles.rideOptionTime}>3 min away</Text>
@@ -110,7 +126,7 @@ export default function RiderModeScreen() {
                 style={[styles.rideOptionActive, { marginTop: 12 }, selectedVehicle !== 'Bike' && { backgroundColor: 'transparent', borderColor: '#E5E7EB', borderWidth: 1 }]}
                 onPress={() => setSelectedVehicle('Bike')}
               >
-                <MaterialIcons name="two-wheeler" size={32} color="#1A1A2E" />
+                <Image source={require('@/assets/images/bike-saver.png')} style={{ width: 44, height: 44, resizeMode: 'contain' }} />
                 <View style={styles.rideOptionInfo}>
                   <Text style={styles.rideOptionName}>Bike</Text>
                   <Text style={styles.rideOptionTime}>1 min away</Text>
