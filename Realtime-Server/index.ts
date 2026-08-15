@@ -176,8 +176,8 @@ app.get('/api/rider/history/:userId', async (req, res) => {
       status: t.status,
       date: new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
       time: new Date(t.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      pickup: "Pickup Location", // Hardcoded fallback for now
-      drop: "Drop Location",
+      pickup: t.pickupAddress || "Pickup Location",
+      drop: t.dropAddress || "Drop Location",
       fare: t.fare || 0,
     }));
     
@@ -201,8 +201,8 @@ app.get('/api/driver/history/:driverId', async (req, res) => {
     const formatted = trips.map((t: any) => ({
       id: t.id,
       date: new Date(t.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
-      pickup: "Pickup Location", // Hardcoded fallback for now, as address might not be in DB
-      drop: "Drop Location", 
+      pickup: t.pickupAddress || "Pickup Location",
+      drop: t.dropAddress || "Drop Location", 
       fare: t.fare || 0,
       status: t.status,
       timestamp: new Date(t.createdAt).getTime()
@@ -212,6 +212,26 @@ app.get('/api/driver/history/:driverId', async (req, res) => {
   } catch (error) {
     console.error('[History API] Driver error:', error);
     res.status(500).json([]);
+  }
+});
+
+app.get('/api/rider/stats/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const [ridesCount, moneySaved, parcelsCount] = await Promise.all([
+      prisma.trip.count({ where: { riderId: userId, status: 'completed' } }),
+      prisma.trip.aggregate({ _sum: { fare: true }, where: { riderId: userId, status: 'completed' } }),
+      prisma.trip.count({ where: { riderId: userId, vehicleType: 'Parcel' } }) // Assuming Parcel is a vehicleType or similar
+    ]);
+
+    // Format money saved logic or apply 10% assumption if you want
+    const saved = moneySaved._sum.fare ? Number((moneySaved._sum.fare * 0.1).toFixed(2)) : 0; 
+    
+    res.json({ success: true, stats: { rides: ridesCount, saved, parcels: parcelsCount } });
+  } catch (error: any) {
+    console.error('[Stats API] Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch stats' });
   }
 });
 
@@ -843,6 +863,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
         let riderName: string = 'Rider';
         let driverRating: number = 0;
         let driverRideCount: number = 0;
+        let profileImageUrl: string = '';
         
         try {
           const [driverDoc, riderDoc, avgRating, rideCount] = await Promise.all([
@@ -854,6 +875,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
           driverPhone = driverDoc?.phone || '';
           driverName = driverDoc?.name || 'Driver';
           vehicleNumber = driverDoc?.vehicleNumber || ''; 
+          profileImageUrl = driverDoc?.profileImageUrl || '';
           riderPhone = riderDoc?.phone || '';
           riderName = riderDoc?.name || 'Rider';
           driverRating = avgRating?._avg?.rating ? Number(avgRating._avg.rating.toFixed(1)) : 0;
@@ -878,27 +900,32 @@ wss.on('connection', (ws: WebSocket, _request: unknown, decodedToken: DecodedTok
           driverRideCount,
           riderName,
           riderPhone,
+          profileImageUrl,
           ...data.payload,
         };
 
-        (async () => {
-          try {
-            const dbTrip = await prisma.trip.create({
-              data: {
-                riderId: data.riderId,
-                driverId: client.id,
-                status: 'accepted',
-                otp: otp,
-                fare: data.payload?.fare ? parseFloat(String(data.payload?.fare)) : null,
-                distance: data.payload?.distance ? parseFloat(String(data.payload?.distance)) : null,
-                vehicleType: data.payload?.vehicleType ?? data.payload?.vehicle ?? null,
-              }
-            });
-            tripRecord.id = dbTrip.id;
-          } catch (e) {
-            console.error('[Prisma] Error creating accepted trip:', e);
-          }
-        })();
+        try {
+          const dbTrip = await prisma.trip.create({
+            data: {
+              riderId: data.riderId,
+              driverId: client.id,
+              status: 'accepted',
+              otp: otp,
+              fare: data.payload?.fare ? parseFloat(String(data.payload?.fare)) : null,
+              distance: data.payload?.distance ? parseFloat(String(data.payload?.distance)) : null,
+              vehicleType: data.payload?.vehicleType ?? data.payload?.vehicle ?? null,
+              pickupAddress: data.payload?.pickupAddress ? String(data.payload.pickupAddress) : null,
+              pickupLat: data.payload?.pickupLat ? parseFloat(String(data.payload?.pickupLat)) : null,
+              pickupLng: data.payload?.pickupLng ? parseFloat(String(data.payload?.pickupLng)) : null,
+              dropAddress: data.payload?.dropAddress ? String(data.payload.dropAddress) : null,
+              dropLat: data.payload?.dropLat ? parseFloat(String(data.payload?.dropLat)) : null,
+              dropLng: data.payload?.dropLng ? parseFloat(String(data.payload?.dropLng)) : null,
+            }
+          });
+          tripRecord.id = dbTrip.id;
+        } catch (e) {
+          console.error('[Prisma] Error creating accepted trip:', e);
+        }
 
         await setActiveTrip(data.riderId, tripRecord);
         await deletePendingRequest(data.riderId);
@@ -1504,10 +1531,11 @@ app.post('/auth/login', async (req, res) => {
     });
 
     let isNewUser = false;
+    let userData = existingUser;
     if (!existingUser) {
       isNewUser = true;
       console.log(`[Auth Login] User not found in DB. Creating new record for ${uid}`);
-      await prisma.user.create({
+      userData = await prisma.user.create({
         data: {
           userId: uid,
           phone: phone,
@@ -1516,6 +1544,10 @@ app.post('/auth/login', async (req, res) => {
       });
     } else {
       console.log(`[Auth Login] User ${uid} found in DB.`);
+      // If the user hasn't completed their profile yet, consider them new
+      if (!existingUser.name) {
+        isNewUser = true;
+      }
     }
 
     // Issue internal JWT for WebSocket Authentication
@@ -1525,7 +1557,7 @@ app.post('/auth/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({ token: internalToken, id: uid, role, isNewUser });
+    res.json({ token: internalToken, id: uid, role, isNewUser, user: userData });
   } catch (dbErr: any) {
     console.error('[Auth Login] DB Error:', dbErr);
     res.status(500).json({ error: 'Database operation failed' });
