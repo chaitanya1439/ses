@@ -64,9 +64,10 @@ function SocketWrapper({ children }: { children: React.ReactNode }) {
   if (!driver) return <>{children}</>;
   
   const handleForceLogout = async () => {
-    alert("You have been logged out because another app is active on this device.");
-    await logout();
-    router.replace('/login');
+    // Disabled for now as requested by user
+    // alert("You have been logged out because another app is active on this device.");
+    // await logout();
+    // router.replace('/login');
   };
 
   return (
