@@ -10,6 +10,7 @@ import { theme } from '@/constants/colors';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSocket } from '@/context/SocketContext';
+import { openGoogleMapsNavigation } from '@/utils/maps';
 import { fetchDirectionsPolyline } from '@/lib/googleMaps';
 import { useAuth } from '@/context/AuthContext';
 
@@ -138,7 +139,22 @@ export function RideRequestPopup() {
       toValue: height,
       duration: 200,
       useNativeDriver: true,
-    }).start(() => router.push('/active-ride'));
+    }).start(() => {
+      Alert.alert(
+        "Start Navigation",
+        "Do you want to open Google Maps to navigate to the pickup location?",
+        [
+          { text: "No", style: "cancel", onPress: () => router.push('/active-ride') },
+          { 
+            text: "Yes", 
+            onPress: () => {
+              router.push('/active-ride');
+              openGoogleMapsNavigation(incomingRide.pickup.lat, incomingRide.pickup.lng, incomingRide.pickup.address);
+            } 
+          }
+        ]
+      );
+    });
   };
 
   const handleReject = () => {
