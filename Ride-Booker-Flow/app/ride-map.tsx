@@ -231,7 +231,7 @@ export default function RideMapScreen() {
 
       {/* ═══ BOTTOM SHEET ═════════════════════════════════════════ */}
       <BottomSheet
-        snapPoints={["50%", "90%"]}
+        snapPoints={["60%", "92%"]}
         index={0}
         handleIndicatorStyle={{ backgroundColor: "#E5E7EB", width: 40, height: 5 }}
         backgroundStyle={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: "#000", shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 20 }}
