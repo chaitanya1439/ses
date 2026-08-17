@@ -47,9 +47,20 @@ function RootLayoutNav() {
         });
       }
     });
+    const unsubTatkal = subscribe("tatkal_ride_started", (payload: any) => {
+      console.log(`[Global] tatkal_ride_started received, navigating to booking-confirmed`);
+      payload.type = "tatkal_ride";
+      setActiveTrip(payload);
+      router.push({
+        pathname: "/booking-confirmed",
+        params: { payload: JSON.stringify(payload) },
+      });
+    });
+
     return () => {
       unsub();
       unsubSync();
+      unsubTatkal();
     };
   }, [subscribe, selectedVehicle, setActiveTrip]);
 
