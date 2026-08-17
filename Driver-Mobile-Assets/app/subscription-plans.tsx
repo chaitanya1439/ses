@@ -222,10 +222,18 @@ export default function SubscriptionPlansScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
               const expiryDate = new Date();
+              if (driver?.subscriptionExpiryDate) {
+                const currentExpiry = new Date(driver.subscriptionExpiryDate);
+                if (currentExpiry > expiryDate) {
+                  expiryDate.setTime(currentExpiry.getTime());
+                }
+              }
               expiryDate.setDate(expiryDate.getDate() + parseInt(selected.days));
 
               const isUnlimited = selected.earnings.toLowerCase() === 'unlimited';
-              const earningLimit = isUnlimited ? 999999 : parseInt(selected.earnings.replace('₹', '').replace(',', ''));
+              const selectedEarningLimit = isUnlimited ? 999999 : parseInt(selected.earnings.replace('₹', '').replace(',', ''));
+              const currentEarningLimit = driver?.subscriptionEarningLimit || 0;
+              const earningLimit = Math.min(999999, currentEarningLimit + selectedEarningLimit);
 
               updateDriver({
                 subscriptionPlanId: selected.id,

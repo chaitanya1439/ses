@@ -298,11 +298,15 @@ export default function ActiveRideScreen() {
               <Text style={styles.locationLabel}>Pickup</Text>
               <Text style={styles.locationText} numberOfLines={2}>{pickup.address}</Text>
             </View>
-            <View style={styles.locationDivider} />
-            <View style={styles.locationBlock}>
-              <Text style={styles.locationLabel}>Dropoff</Text>
-              <Text style={styles.locationText} numberOfLines={2}>{drop.address}</Text>
-            </View>
+            {activeRideStep === 'started' && (
+              <>
+                <View style={styles.locationDivider} />
+                <View style={styles.locationBlock}>
+                  <Text style={styles.locationLabel}>Dropoff</Text>
+                  <Text style={styles.locationText} numberOfLines={2}>{drop.address}</Text>
+                </View>
+              </>
+            )}
           </View>
 
           <View style={styles.tripMetaCol}>
@@ -340,6 +344,11 @@ export default function ActiveRideScreen() {
                 setOtpInput('');
                 setShowOtpModal(true);
               }}
+            />
+          ) : activeRideStep === 'started' ? (
+            <SwipeButton 
+              title={completing ? 'Processing...' : stepConfig.label}
+              onSwipeSuccess={handlePrimaryAction}
             />
           ) : (
             <Pressable

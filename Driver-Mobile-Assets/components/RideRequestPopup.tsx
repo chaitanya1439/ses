@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSocket } from '@/context/SocketContext';
 import { openGoogleMapsNavigation } from '@/utils/maps';
+import * as Location from 'expo-location';
 import { fetchDirectionsPolyline } from '@/lib/googleMaps';
 import { useAuth } from '@/context/AuthContext';
 
@@ -30,6 +31,7 @@ export function RideRequestPopup() {
   const countdownRef = useRef<ReturnType<typeof Animated.timing> | null>(null);
   const mapRef = useRef<MapView>(null);
   const [routeCoords, setRouteCoords] = useState<{latitude: number; longitude: number}[]>([]);
+  const [driverLocation, setDriverLocation] = useState<{lat: number, lng: number} | null>(null);
 
   const hideAndReject = useCallback(() => {
     Animated.timing(slideAnim, {
@@ -41,6 +43,12 @@ export function RideRequestPopup() {
 
   useEffect(() => {
     if (showRidePopup) {
+      (async () => {
+        const loc = await Location.getLastKnownPositionAsync();
+        if (loc) {
+          setDriverLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        }
+      })();
       setSeconds(COUNTDOWN_SECONDS);
       countdownAnim.setValue(1);
       Animated.spring(slideAnim, {
@@ -85,24 +93,22 @@ export function RideRequestPopup() {
 
   // Fetch road-following polyline for the map
   useEffect(() => {
-    if (!incomingRide || !showRidePopup) return;
+    if (!incomingRide || !showRidePopup || !driverLocation) return;
     const pickupCoord = { latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng };
-    const dropCoord = { latitude: incomingRide.drop.lat, longitude: incomingRide.drop.lng };
+    const driverCoord = { latitude: driverLocation.lat, longitude: driverLocation.lng };
     (async () => {
-      const coords = await fetchDirectionsPolyline(pickupCoord, dropCoord);
+      const coords = await fetchDirectionsPolyline(driverCoord, pickupCoord);
       if (coords && coords.length > 1) {
-        // Pad with exact marker coords so polyline visually connects to pins
-        setRouteCoords([pickupCoord, ...coords, dropCoord]);
-        // Fit map to show entire route
+        setRouteCoords([driverCoord, ...coords, pickupCoord]);
         setTimeout(() => {
-          mapRef.current?.fitToCoordinates([pickupCoord, ...coords, dropCoord], {
+          mapRef.current?.fitToCoordinates([driverCoord, ...coords, pickupCoord], {
             edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
             animated: true,
           });
         }, 300);
       } else {
         // Fallback: straight line
-        setRouteCoords([pickupCoord, dropCoord]);
+        setRouteCoords([driverCoord, pickupCoord]);
       }
     })();
   }, [incomingRide, showRidePopup]);
@@ -208,22 +214,27 @@ export function RideRequestPopup() {
               rotateEnabled={false}
             >
               <Marker coordinate={{ latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng }} anchor={{ x: 0.5, y: 0.5 }} style={{ zIndex: 10 }}>
-                <View style={styles.pickupDot} />
-              </Marker>
-              <Marker coordinate={{ latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng }} anchor={{ x: 0.5, y: 0 }} style={{ zIndex: 20 }}>
-                <View style={styles.markerLabel}>
-                  <Text style={styles.markerLabelText} numberOfLines={1}>{incomingRide.pickup.address.split(',')[0]}</Text>
-                </View>
-              </Marker>
-              
-              <Marker coordinate={{ latitude: incomingRide.drop.lat, longitude: incomingRide.drop.lng }} anchor={{ x: 0.5, y: 0.5 }} style={{ zIndex: 10 }}>
                 <View style={styles.dropSquare} />
               </Marker>
-              <Marker coordinate={{ latitude: incomingRide.drop.lat, longitude: incomingRide.drop.lng }} anchor={{ x: 0.5, y: 0 }} style={{ zIndex: 20 }}>
+              <Marker coordinate={{ latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng }} anchor={{ x: 0.5, y: 0 }} style={{ zIndex: 20 }}>
                 <View style={[styles.markerLabel, { backgroundColor: theme.colors.dark }]}>
-                  <Text style={[styles.markerLabelText, { color: '#FFF' }]} numberOfLines={1}>{incomingRide.drop.address.split(',')[0]}</Text>
+                  <Text style={[styles.markerLabelText, { color: '#FFF' }]} numberOfLines={1}>{incomingRide.pickup.address.split(',')[0]}</Text>
                 </View>
               </Marker>
+
+              {driverLocation && (
+                <>
+                  <Marker coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }} anchor={{ x: 0.5, y: 0.5 }} style={{ zIndex: 10 }}>
+                    <View style={styles.pickupDot} />
+                  </Marker>
+                  <Marker coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }} anchor={{ x: 0.5, y: 0 }} style={{ zIndex: 20 }}>
+                    <View style={styles.markerLabel}>
+                      <Text style={styles.markerLabelText} numberOfLines={1}>My Location</Text>
+                    </View>
+                  </Marker>
+                </>
+              )}
+
               {routeCoords.length > 1 && (
                 <Polyline
                   coordinates={routeCoords}
@@ -239,12 +250,7 @@ export function RideRequestPopup() {
             <View style={styles.locationCol}>
               <View style={styles.locationRow}>
                 <View style={[styles.dot, { backgroundColor: theme.colors.success }]} />
-                <Text style={styles.locationText} numberOfLines={1}>{incomingRide.pickup.address}</Text>
-              </View>
-              <View style={styles.locationDivider} />
-              <View style={styles.locationRow}>
-                <View style={[styles.dot, { backgroundColor: theme.colors.danger }]} />
-                <Text style={styles.locationText} numberOfLines={1}>{incomingRide.drop.address}</Text>
+                <Text style={styles.locationText} numberOfLines={2}>{incomingRide.pickup.address}</Text>
               </View>
             </View>
             <View style={styles.priceCol}>

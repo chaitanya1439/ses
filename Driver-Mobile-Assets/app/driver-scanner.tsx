@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -22,6 +23,7 @@ import { theme } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
 import { useRide } from "@/context/RideContext";
+import { openGoogleMapsNavigation } from "@/utils/maps";
 
 // ─── Types ───────────────────────────────────────────────────────────
 type ScreenState = "scanning" | "processing" | "success" | "error";
@@ -278,7 +280,22 @@ export default function DriverScannerScreen() {
 
       // Navigate to active ride after brief success display
       setTimeout(() => {
-        router.replace("/active-ride");
+        Alert.alert(
+          "Ride Started",
+          "Do you want to start navigation to drop location?",
+          [
+            { text: "No", style: "cancel", onPress: () => router.replace("/active-ride") },
+            { 
+              text: "Yes", 
+              onPress: () => {
+                if (payload.drop?.lat && payload.drop?.lng) {
+                  openGoogleMapsNavigation(payload.drop.lat, payload.drop.lng, payload.drop.address || payload.drop.label);
+                }
+                router.replace("/active-ride");
+              }
+            }
+          ]
+        );
       }, 2000);
     });
 
