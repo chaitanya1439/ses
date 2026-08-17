@@ -28,7 +28,7 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribe('CHAT_MESSAGE', (payload: any) => {
+    const unsubscribe = subscribe('chat_message', (payload: any) => {
       if (payload.from === targetId || payload.fromId === targetId) {
         setMessages(prev => [...prev, {
           id: Math.random().toString(),
@@ -46,7 +46,7 @@ export default function ChatModal({ visible, onClose, targetId, driverName }: Ch
   const handleSend = () => {
     if (!inputText.trim()) return;
     
-    sendMessage('CHAT_MESSAGE', { to: targetId, message: inputText.trim() });
+    sendMessage('chat_message', { to: targetId, message: inputText.trim() });
     
     setMessages(prev => [...prev, {
       id: Math.random().toString(),
