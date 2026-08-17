@@ -11,6 +11,8 @@ import { RideProvider } from "@/context/RideContext";
 import { SocketProvider, useSocket } from "@/context/SocketContext";
 import { RiderModeProvider } from "@/context/RiderModeContext";
 import { RideRequestPopup } from "@/components/RideRequestPopup";
+import * as TaskManager from "expo-task-manager";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   useFonts,
   Poppins_400Regular,
@@ -20,6 +22,48 @@ import {
 } from "@expo-google-fonts/poppins";
 
 SplashScreen.preventAutoHideAsync();
+
+const BACKGROUND_LOCATION_TASK = "BACKGROUND_LOCATION_TASK";
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error("[TaskManager] Error:", error);
+    return;
+  }
+  if (data) {
+    const { locations } = data as any;
+    if (!locations || locations.length === 0) return;
+    const loc = locations[0];
+    try {
+      const driverSessionStr = await AsyncStorage.getItem("driver_session");
+      if (driverSessionStr) {
+        const driverSession = JSON.parse(driverSessionStr);
+        if (driverSession.token) {
+          const res = await fetch("https://real.shelteric.com/api/location", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${driverSession.token}`
+            },
+            body: JSON.stringify({
+              location: {
+                lat: loc.coords.latitude,
+                lng: loc.coords.longitude,
+                speed: loc.coords.speed,
+                heading: loc.coords.heading
+              }
+            })
+          });
+          if (!res.ok) {
+            console.log("[TaskManager] Background location post failed:", res.status);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[TaskManager] Exception:", e);
+    }
+  }
+});
 
 function RootLayoutNav() {
   const { subscribe } = useSocket();

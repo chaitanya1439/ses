@@ -70,9 +70,23 @@ export default function ActiveRideScreen() {
       if (!activeRide || !driver?.token) return;
 
       try {
+        const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+        if (fgStatus !== 'granted') return;
 
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
+        const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+        if (bgStatus === 'granted') {
+          await Location.startLocationUpdatesAsync("BACKGROUND_LOCATION_TASK", {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 2000,
+            distanceInterval: 10,
+            showsBackgroundLocationIndicator: true,
+            foregroundService: {
+              notificationTitle: "Ride in Progress",
+              notificationBody: "Live tracking is active",
+              notificationColor: "#10B981"
+            }
+          });
+        }
 
         locationSubscription = await Location.watchPositionAsync(
           {
@@ -105,6 +119,7 @@ export default function ActiveRideScreen() {
       if (locationSubscription) {
         locationSubscription.remove();
       }
+      Location.stopLocationUpdatesAsync("BACKGROUND_LOCATION_TASK").catch(() => {});
     };
   }, [activeRide, driver, riderId, sendThrottledMessage]);
 
