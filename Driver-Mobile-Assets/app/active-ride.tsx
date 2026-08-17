@@ -235,6 +235,19 @@ export default function ActiveRideScreen() {
           </View>
           <View style={styles.contactActions}>
             <Pressable 
+              style={[styles.contactBtn, { backgroundColor: '#FEF3C7' }]} 
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                if (activeRideStep === 'navigate') {
+                  openGoogleMapsNavigation(pickup.lat, pickup.lng, pickup.address);
+                } else {
+                  openGoogleMapsNavigation(drop.lat, drop.lng, drop.address);
+                }
+              }}
+            >
+              <Ionicons name="navigate" size={20} color="#D97706" />
+            </Pressable>
+            <Pressable 
               style={[styles.contactBtn, { backgroundColor: '#ECFDF5' }]} 
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

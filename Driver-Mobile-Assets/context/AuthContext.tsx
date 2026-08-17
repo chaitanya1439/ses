@@ -163,6 +163,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = { ...driver, ...updates };
     setDriver(updated);
     AsyncStorage.setItem('driver_session', JSON.stringify(updated));
+
+    if (updated.token) {
+      fetch('https://real.shelteric.com/auth/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${updated.token}`
+        },
+        body: JSON.stringify(updates)
+      }).catch(e => console.warn('Backend sync failed', e));
+    }
   };
 
   const value = useMemo(() => ({
