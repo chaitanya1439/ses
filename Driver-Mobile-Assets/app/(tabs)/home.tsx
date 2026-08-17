@@ -34,7 +34,7 @@ export default function HomeScreen() {
     syncRide,
     activeRide,
   } = useRide();
-  const { driver } = useAuth();
+  const { driver, updateDriver } = useAuth();
 
   const [showNightFare, setShowNightFare] = useState(false);
   const [showGoToZone, setShowGoToZone] = useState(false);
@@ -168,9 +168,11 @@ export default function HomeScreen() {
           const stats = await res.json();
           setTodayEarnings(stats.todayEarnings);
           // Update driver subscription locally for UI
-          if (driver) {
-             driver.subscriptionStatus = stats.subscriptionStatus;
-             driver.subscriptionExpiryDate = stats.subscriptionExpiry;
+          if (driver && (driver.subscriptionStatus !== stats.subscriptionStatus || driver.subscriptionExpiryDate !== stats.subscriptionExpiry)) {
+             updateDriver({
+               subscriptionStatus: stats.subscriptionStatus,
+               subscriptionExpiryDate: stats.subscriptionExpiry
+             });
           }
         }
       } catch (e) {

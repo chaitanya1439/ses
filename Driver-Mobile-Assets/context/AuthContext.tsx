@@ -50,7 +50,7 @@ interface AuthContextValue {
   driver: Driver | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (phone: string, token?: string, id?: string) => Promise<void>;
+  login: (phone: string, token?: string, id?: string, userData?: Partial<Driver>) => Promise<void>;
   requestOTP: (phone: string) => Promise<void>;
   verifyOTP: (code: string, phone: string) => Promise<void>;
   register: (data: Omit<Driver, 'id' | 'rating' | 'totalRides' | 'hoursOnline' | 'earningsThisMonth' | 'token' | 'isVerified' | 'verifiedDocuments'>) => Promise<void>;
@@ -97,12 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const login = async (phone: string, token?: string, id?: string) => {
+  const login = async (phone: string, token?: string, id?: string, userData?: Partial<Driver>) => {
     const newDriver: Driver = {
       ...DEFAULT_DRIVER,
+      ...userData,
       phone,
       token: token || DEFAULT_DRIVER.token,
-      id: id || `temp-${Date.now()}`,
+      id: id || userData?.id || `temp-${Date.now()}`,
     };
     await AsyncStorage.setItem('driver_session', JSON.stringify(newDriver));
     setDriver(newDriver);
