@@ -84,9 +84,11 @@ export default function LoginScreen() {
       }
 
       // Store the JWT token and login
+      const driverData = data.driver || data.user || {};
       await login(fullPhone, data.token, data.user?.id || data.id, {
-        ...(data.driver || data.user || {}),
-        isVerified: !data.isNewUser
+        ...driverData,
+        isVerified: !data.isNewUser,
+        subscriptionExpiryDate: driverData.subscriptionExpiryDate || driverData.subscriptionExpiry,
       });
       
       // Route based on user existence
