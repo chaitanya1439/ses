@@ -261,11 +261,11 @@ export default function DriverScannerScreen() {
           lat: payload.pickup?.lat || 17.385,
           lng: payload.pickup?.lng || 78.4867,
         },
-        drop: {
-          address: payload.drop?.label || 'Dropoff Location',
-          lat: payload.drop?.lat || 17.426,
-          lng: payload.drop?.lng || 78.4601,
-        },
+        drop: payload.drop?.lat ? {
+          address: payload.drop.label || 'Dropoff Location',
+          lat: payload.drop.lat,
+          lng: payload.drop.lng,
+        } : null,
         distance: '5.0 km',
         fare: payload.fare ? Number(payload.fare) : 150,
         type: payload.vehicle || 'Auto',
