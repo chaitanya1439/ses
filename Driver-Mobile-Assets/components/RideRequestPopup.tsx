@@ -18,7 +18,7 @@ const { height } = Dimensions.get('window');
 const COUNTDOWN_SECONDS = 15;
 
 export function RideRequestPopup() {
-  const { incomingRide, showRidePopup, acceptRide, rejectRide, advanceRideStep } = useRide();
+  const { incomingRide, showRidePopup, acceptRide, rejectRide } = useRide();
   const { sendMessage } = useSocket();
   const { driver } = useAuth();
   const hasSubscription = driver?.subscriptionStatus === 'active';
@@ -148,7 +148,6 @@ export function RideRequestPopup() {
           { 
             text: "Yes", 
             onPress: () => {
-              advanceRideStep();
               sendMessage('trip_status_update', { riderId: (incomingRide as any).riderId || incomingRide.customer?.id, status: 'navigating' });
               router.push('/active-ride');
               openGoogleMapsNavigation(incomingRide.pickup.lat, incomingRide.pickup.lng, incomingRide.pickup.address);
