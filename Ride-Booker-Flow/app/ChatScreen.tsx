@@ -65,7 +65,7 @@ export default function ChatScreen() {
 
   // 6. WEBSOCKET - Listen for messages
   useEffect(() => {
-    const unsub = subscribe("CHAT_MESSAGE", (data) => {
+    const unsub = subscribe("chat_message", (data) => {
       // Check if message is from the matched driver
       if (data.from === driver.id && data.message) {
         const newMsg: Message = {
@@ -85,7 +85,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (isConnected && messageQueue.length > 0) {
       messageQueue.forEach((msg) => {
-        sendMessage("CHAT_MESSAGE", { to: driver.id, message: msg.text });
+        sendMessage("chat_message", { to: driver.id, message: msg.text });
       });
       setMessages((prev) =>
         prev.map((m) => (m.pending ? { ...m, pending: false } : m)),
@@ -109,7 +109,7 @@ export default function ChatScreen() {
     setShowQuickReplies(false);
 
     if (isConnected) {
-      sendMessage("CHAT_MESSAGE", { to: driver.id, message: text.trim() });
+      sendMessage("chat_message", { to: driver.id, message: text.trim() });
     } else {
       setMessageQueue((prev) => [...prev, newMsg]);
     }
