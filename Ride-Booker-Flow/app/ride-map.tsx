@@ -13,7 +13,7 @@ import { useBooking } from "@/contexts/BookingContext";
 import { useFareCalculator, VehicleOption } from "@/hooks/useFareCalculator";
 import { customMapStyle } from "@/constants/mapStyle";
 import { LinearGradient } from "expo-linear-gradient";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetScrollView, BottomSheetView } from "@gorhom/bottom-sheet";
 
 // ─── Skeleton shimmer ────────────────────────────────────────────────
 function Shimmer({ w, h, r = 6, style }: { w: number | string; h: number; r?: number; style?: object }) {
@@ -236,7 +236,7 @@ export default function RideMapScreen() {
         handleIndicatorStyle={{ backgroundColor: "#E5E7EB", width: 40, height: 5 }}
         backgroundStyle={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 32, borderTopRightRadius: 32, shadowColor: "#000", shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 20 }}
       >
-        <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 24) }}>
+        <BottomSheetView style={{ flex: 1, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 24) }}>
         {isLoading ? (
           <>
             <Text style={s.sheetTitle}>Finding rides for you...</Text>
@@ -316,7 +316,7 @@ export default function RideMapScreen() {
             </View>
           </>
         )}
-        </View>
+        </BottomSheetView>
       </BottomSheet>
     </View>
   );
