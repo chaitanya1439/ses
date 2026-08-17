@@ -119,7 +119,7 @@ export default function CustomerQRScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const unsub = subscribe("tatkal_ride_started", (payload: any) => {
+    const unsub = subscribe("ride_started", (payload: any) => {
       if (payload?.bookingId === bookingId || payload?.code === fallbackCode) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setRideStarted(true);

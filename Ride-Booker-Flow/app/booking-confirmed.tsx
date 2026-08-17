@@ -69,12 +69,13 @@ export default function BookingConfirmedScreen() {
   const initPayload = useMemo(() => initPayloadStr ? JSON.parse(initPayloadStr) : null, [initPayloadStr]);
 
   // UI state
+  const isTatkal = initPayload?.type === 'tatkal_ride' || initPayload?.type === 'tatkal' || initPayload?.vehicleType === 'tatkal';
   const [isConfirmed, setIsConfirmed] = useState(!!initPayload);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(isTatkal ? 1 : 0);
   const [canCancel, setCanCancel] = useState(true);
   const [etaRemaining, setEtaRemaining] = useState<number | null>(null); // null until real ETA arrives
   const [etaText, setEtaText] = useState<string>('Calculating...');
-  const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [isOtpVerified, setIsOtpVerified] = useState(isTatkal);
   const [searchFailed, setSearchFailed] = useState(false);
   const [driverDetails, setDriverDetails] = useState<{
     id?: string;
