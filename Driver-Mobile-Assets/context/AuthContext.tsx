@@ -9,6 +9,8 @@ export interface Driver {
   email: string;
   vehicleType: string;
   vehicleNumber: string;
+  dob?: string;
+  languages?: string;
   vehicleBrand?: string;
   vehicleModel?: string;
   vehicleColor?: string;

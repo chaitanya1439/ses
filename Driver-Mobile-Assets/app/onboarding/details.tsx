@@ -22,12 +22,14 @@ export default function AdditionalDetails() {
   const [phone, setPhone] = useState(driver?.phone || '');
   const [alternatePhone, setAlternatePhone] = useState(driver?.alternatePhone || '');
   const [gender, setGender] = useState(driver?.gender || '');
+  const [dob, setDob] = useState(driver?.dob || '');
+  const [languages, setLanguages] = useState(driver?.languages || '');
   const [vehicleType, setVehicleType] = useState(driver?.vehicleType || 'Bike');
   const [vehicleNumber, setVehicleNumber] = useState(driver?.vehicleNumber || '');
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
-    if (!name || !email || !phone || !gender || !vehicleType || !vehicleNumber) {
+    if (!name || !email || !phone || !gender || !dob || !languages || !vehicleType || !vehicleNumber) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -54,6 +56,8 @@ export default function AdditionalDetails() {
       phone,
       alternatePhone,
       gender,
+      dob,
+      languages,
       isDetailsVerified: true,
     });
 
@@ -115,6 +119,24 @@ export default function AdditionalDetails() {
           onChangeText={setAlternatePhone}
           placeholder="Enter alternate phone (optional)"
           keyboardType="phone-pad"
+          placeholderTextColor={theme.colors.textMuted}
+        />
+
+        <Text style={styles.label}>Date of Birth *</Text>
+        <TextInput 
+          style={styles.input}
+          value={dob}
+          onChangeText={setDob}
+          placeholder="DD/MM/YYYY"
+          placeholderTextColor={theme.colors.textMuted}
+        />
+
+        <Text style={styles.label}>Languages Known *</Text>
+        <TextInput 
+          style={styles.input}
+          value={languages}
+          onChangeText={setLanguages}
+          placeholder="e.g. English, Telugu, Hindi"
           placeholderTextColor={theme.colors.textMuted}
         />
 
