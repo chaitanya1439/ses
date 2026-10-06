@@ -633,7 +633,7 @@ export default function ParcelConfirmedScreen() {
                     <Image source={require("@/assets/images/bike-saver-icon.png")} style={{ width: 60, height: 60, resizeMode: "contain" }} />
                   )}
                 </View>
-              </Marker>
+              </Marker.Animated>
             )}
 
             {/* Driver → Pickup polyline */}

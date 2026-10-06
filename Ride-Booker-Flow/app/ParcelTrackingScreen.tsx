@@ -197,7 +197,7 @@ export default function ParcelTrackingScreen() {
                     color={Colors.white}
                   />
                 </View>
-              </Marker>
+              </Marker.Animated>
             )}
 
             {/* Route Polyline */}
