@@ -16,12 +16,12 @@ import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Filter = "all" | "completed" | "cancelled";
+type Filter = "all" | "completed" | "cancelled" | "scheduled";
 
 interface Ride {
   id: string;
   vehicle: "Bike" | "Scooty" | "Auto" | "Car";
-  status: "completed" | "cancelled" | "upcoming";
+  status: "completed" | "cancelled" | "scheduled";
   date: string;
   time: string;
   pickup: string;
@@ -77,7 +77,7 @@ export default function MyRidesScreen() {
 
       {/* Filter Tabs */}
       <View style={styles.filterRow}>
-        {(["all", "completed", "cancelled"] as Filter[]).map((f) => (
+        {(["all", "completed", "cancelled", "scheduled"] as Filter[]).map((f) => (
           <Pressable
             key={f}
             style={[styles.filterTab, filter === f && styles.filterTabActive]}
@@ -142,6 +142,8 @@ export default function MyRidesScreen() {
                     styles.statusBadge,
                     item.status === "completed"
                       ? styles.statusCompleted
+                      : item.status === "scheduled"
+                      ? { backgroundColor: "#DBEAFE" }
                       : styles.statusCancelled,
                   ]}
                 >
@@ -150,10 +152,12 @@ export default function MyRidesScreen() {
                       styles.statusText,
                       item.status === "completed"
                         ? styles.statusTextCompleted
+                        : item.status === "scheduled"
+                        ? { color: "#1D4ED8" }
                         : styles.statusTextCancelled,
                     ]}
                   >
-                    {item.status}
+                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                   </Text>
                 </View>
               </View>

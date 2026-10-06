@@ -13,6 +13,7 @@ interface RideRequestPayload {
   distance?: string | number;
   pickupAddress?: string;
   dropAddress?: string;
+  scheduledTime?: string;
 }
 
 interface RequestRideResponse {
@@ -72,7 +73,8 @@ export function useRequestRide({ token }: { token: string }): UseRequestRideRetu
   const requestRide = useCallback(
     async (payload: RideRequestPayload): Promise<RequestRideResponse> => {
       const baseUrl = getHttpBaseUrl();
-      const url = `${baseUrl}/api/request-ride`;
+      const endpoint = payload.scheduledTime ? '/api/schedule-ride' : '/api/request-ride';
+      const url = `${baseUrl}${endpoint}`;
 
       try {
         const response = await fetch(url, {

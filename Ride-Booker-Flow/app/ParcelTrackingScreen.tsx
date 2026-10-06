@@ -10,7 +10,7 @@ import {
   Animated,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, AnimatedRegion } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
@@ -57,6 +57,14 @@ export default function ParcelTrackingScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+
+  const driverCoordAnim = useRef(new AnimatedRegion({
+    latitude: 17.38,
+    longitude: 78.4867,
+    latitudeDelta: 0,
+    longitudeDelta: 0,
+  })).current;
+
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [routeCoords, setRouteCoords] = useState<
     { latitude: number; longitude: number }[]
@@ -103,7 +111,7 @@ export default function ParcelTrackingScreen() {
 
     const unsubLoc = subscribe("DRIVER_LOCATION", (data) => {
       if (data.lat && data.lng) {
-        setDriverCoords({ latitude: data.lat, longitude: data.lng });
+        driverCoordAnim.timing({ latitude: data.lat, longitude: data.lng, duration: 4000, useNativeDriver: false }).start();
       }
     });
 
@@ -181,7 +189,7 @@ export default function ParcelTrackingScreen() {
 
             {/* Real-time Driver Marker */}
             {driverCoords && (
-              <Marker coordinate={driverCoords}>
+              <Marker.Animated coordinate={driverCoordAnim as any}>
                 <View style={styles.driverMarker}>
                   <MaterialCommunityIcons
                     name="bike"

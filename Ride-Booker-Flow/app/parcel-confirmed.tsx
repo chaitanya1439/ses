@@ -14,7 +14,7 @@ import {
   Linking,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, AnimatedRegion } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -151,6 +151,14 @@ export default function ParcelConfirmedScreen() {
     latitude: pickup?.lat ? pickup.lat - 0.005 : 17.38,
     longitude: pickup?.lng ?? 78.4867,
   });
+
+  const driverCoordAnim = useRef(new AnimatedRegion({
+    latitude: pickup?.lat ? pickup.lat - 0.005 : (pickupCoord?.latitude || 17.38) - 0.005,
+    longitude: pickup?.lng ?? (pickupCoord?.longitude || 78.4867),
+    latitudeDelta: 0,
+    longitudeDelta: 0,
+  })).current;
+
   const [driverHeading, setDriverHeading] = useState(0);
 
   // Real online vehicles for searching phase
@@ -250,7 +258,7 @@ export default function ParcelConfirmedScreen() {
         const lat = from.latitude + (to.latitude - from.latitude) * p;
         const lng = from.longitude + (to.longitude - from.longitude) * p;
 
-        setDriverCoord({ latitude: lat, longitude: lng });
+        driverCoordAnim.timing({ latitude: lat, longitude: lng, duration: 4000, useNativeDriver: false }).start();
         setDriverHeading(getBearing(from, to));
 
         // Prepend the interpolated driver position to the polyline so there's
@@ -322,26 +330,16 @@ export default function ParcelConfirmedScreen() {
           setDriverHeading(calculatedHeading);
         }
 
-      const step = (timestamp: number) => {
-        if (!startTime) startTime = timestamp;
-        const progress = Math.min((timestamp - startTime) / DURATION, 1);
-
-        // Ease out quad
-        const easeProgress = progress * (2 - progress);
-
-        const currentLat = startLat + (endLat - startLat) * easeProgress;
-        const currentLng = startLng + (endLng - startLng) * easeProgress;
-
-        setDriverCoord({ latitude: currentLat, longitude: currentLng });
+      
         
         // Removed dynamic camera tracking to prevent map jumping
 
         if (progress < 1) {
-          liveAnimIdRef.current = requestAnimationFrame(step);
+          
         }
       };
 
-      liveAnimIdRef.current = requestAnimationFrame(step);
+      
 
       // Return prevCoord to immediately satisfy the state update, actual animation happens in loop
       return prevCoord;
@@ -627,7 +625,7 @@ export default function ParcelConfirmedScreen() {
 
             {/* Live driver marker with rotation */}
             {isConfirmed && (
-              <Marker coordinate={driverCoord} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
+              <Marker.Animated coordinate={driverCoordAnim as any} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
                 <View style={styles.liveDriverMarkerWrap}>
                   {selectedVehicle?.includes('auto') ? (
                     <Image source={require("@/assets/images/auto-logo.png")} style={{ width: 60, height: 60, resizeMode: "contain" }} />

@@ -24,6 +24,7 @@ export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider' | 'driver', userId: string, token?: string, onForceLogout?: () => void }> = ({ children, role, userId, token, onForceLogout }) => {
   const [isConnected, setIsConnected] = useState(false);
+  const [socketInstance, setSocketInstance] = useState<WebSocket | null>(null);
   
   // Event Emitter pattern for components to easily subscribe to specific real-time events
   const listenersRef = useRef<{ [type: string]: Set<(payload: any) => void> }>({});
@@ -74,6 +75,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
     
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+      setSocketInstance(ws);
 
     ws.onopen = async () => {
       console.log(`[WS] Connected!`);
@@ -115,6 +117,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
       if (isComponentMounted.current && token && userId) {
         console.log(`[WS] Attempting to reconnect in 3s...`);
         reconnectTimeoutRef.current = setTimeout(() => {
+          // eslint-disable-next-line
           connect();
         }, 3000);
       }
@@ -127,7 +130,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
 
   useEffect(() => {
     isComponentMounted.current = true;
-    connect();
+    // eslint-disable-next-line
+          connect();
 
     return () => {
       isComponentMounted.current = false;
@@ -145,6 +149,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
       if (nextAppState === 'active') {
         if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
           console.log('[WS] App became active, reconnecting...');
+          // eslint-disable-next-line
           connect();
         }
       }
@@ -174,7 +179,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode, role: 'rider'
   }, [sendMessage]);
 
   return (
-    <SocketContext.Provider value={{ socket: wsRef.current, isConnected, sendMessage, sendThrottledMessage, subscribe }}>
+    <SocketContext.Provider value={{ socket: socketInstance, isConnected, sendMessage, sendThrottledMessage, subscribe }}>
       {children}
     </SocketContext.Provider>
   );

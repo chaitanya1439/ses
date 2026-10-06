@@ -22,11 +22,19 @@
         "NSLocationWhenInUseUsageDescription": "RideGo needs your location to find nearby rides and drivers.",
         "NSLocationAlwaysUsageDescription": "RideGo needs your location to track your ride.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.ridego",
       "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_SETTINGS",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -106,7 +114,7 @@
       }
     },
     "updates": {
-      "url": ""
+      "url": "https://u.expo.dev/ffd103ad-8ac4-407a-a511-818380f6a69d"
     },
     "owner": "normallyyyy"
   }

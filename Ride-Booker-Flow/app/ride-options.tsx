@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -35,6 +36,10 @@ export default function RideOptionsScreen() {
   });
   const { sendThrottledMessage, subscribe } = useSocket();
   const [upsellVisible, setUpsellVisible] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
+  const [isRequesting, setIsRequesting] = useState(false);
+
   const [upsellTimer, setUpsellTimer] = useState(10);
   const upsellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upsellInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -174,16 +179,38 @@ export default function RideOptionsScreen() {
 
   const handleBook = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Store fare in BookingContext for downstream screens
     if (selectedOption?.fare) {
       setFare(selectedOption.fare);
     }
+    
+    if (scheduledTime) {
+      setIsRequesting(true);
+      // Schedule Ride directly from here
+      const payload = {
+        pickupLocation: pickup,
+        dropLocation: drop,
+        fare: selectedOption?.fare || 0,
+        vehicleType: selectedVehicle,
+        distance: 5, // Approximate or get from context if available
+        scheduledTime: scheduledTime.toISOString()
+      };
+      const res = await requestRide(payload as any);
+      setIsRequesting(false);
+      if (res.success) {
+        Alert.alert("Success", "Ride Scheduled successfully! You can view it in My Rides.");
+        router.dismissAll();
+        router.replace("/home" as any);
+      } else {
+        Alert.alert("Error", "Failed to schedule ride.");
+      }
+      return;
+    }
+
     if (selectedVehicle === "bike" || selectedVehicle === "bike-saver") {
       showUpsell();
     } else if (selectedVehicle === "parcel") {
       router.push("/review-delivery" as any);
     } else {
-      // We just route to confirm-pickup. The actual request happens there.
       router.push("/confirm-pickup" as any);
     }
   };
@@ -370,20 +397,33 @@ export default function RideOptionsScreen() {
             </Pressable>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.bookBtn,
-              pressed && styles.pressedSurface,
-            ]}
-            onPress={handleBook}
-          >
-            <Text style={styles.bookBtnText}>
-              Book {selectedOption?.name ?? "Ride"}
-            </Text>
-            <Text style={styles.bookBtnFare}>
-              ₹{selectedOption?.fare ?? 48}
-            </Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Pressable 
+              style={[styles.bookBtn, { flex: 0.25, backgroundColor: Colors.lightGrey, alignItems: 'center', justifyContent: 'center' }]}
+              onPress={() => setShowSchedule(true)}
+            >
+              <Ionicons name="calendar-outline" size={24} color={Colors.dark} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.bookBtn,
+                { flex: 0.75 },
+                pressed && styles.pressedSurface,
+                isRequesting && { opacity: 0.5 }
+              ]}
+              onPress={handleBook}
+              disabled={isRequesting}
+            >
+              <Text style={styles.bookBtnText}>
+                {scheduledTime ? `Schedule for ${scheduledTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : `Book ${selectedOption?.name ?? "Ride"}`}
+              </Text>
+              {!scheduledTime && (
+                <Text style={styles.bookBtnFare}>
+                  ₹{selectedOption?.fare ?? 48}
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -452,6 +492,47 @@ export default function RideOptionsScreen() {
           <Text style={[styles.upsellTimer, { marginTop: 24 }]}>Tolls and taxes may apply extra.</Text>
         </View>
       </Modal>
+    
+      {/* Schedule Modal */}
+      {showSchedule && (
+        <Modal transparent visible={showSchedule} animationType="fade">
+          <Pressable style={styles.overlay} onPress={() => setShowSchedule(false)}>
+            <View style={styles.scheduleBox}>
+              <Text style={styles.upsellTitle}>Schedule Ride</Text>
+              <Text style={styles.upsellSubtitle}>Choose a pickup time</Text>
+              
+              <View style={{ marginTop: 20, gap: 12 }}>
+                {[30, 60, 120, 240].map((mins) => {
+                  const time = new Date(Date.now() + mins * 60000);
+                  return (
+                    <Pressable 
+                      key={mins}
+                      style={styles.timeSlot}
+                      onPress={() => {
+                        setScheduledTime(time);
+                        setShowSchedule(false);
+                      }}
+                    >
+                      <Text style={styles.timeSlotText}>
+                        {mins < 60 ? `In ${mins} mins` : `In ${mins/60} hours`} ({time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+                <Pressable 
+                  style={[styles.timeSlot, { backgroundColor: '#FEE2E2' }]}
+                  onPress={() => {
+                    setScheduledTime(null);
+                    setShowSchedule(false);
+                  }}
+                >
+                  <Text style={[styles.timeSlotText, { color: '#DC2626' }]}>Clear Schedule</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -507,6 +588,9 @@ function VehicleRow({
 }
 
 const styles = StyleSheet.create({
+  scheduleBox: { width: '85%', backgroundColor: Colors.white, borderRadius: 16, padding: 24 },
+  timeSlot: { padding: 16, backgroundColor: Colors.lightGrey, borderRadius: 12, alignItems: 'center' },
+  timeSlotText: { fontSize: 16, fontFamily: "Poppins_500Medium", color: Colors.dark },
   container: {
     flex: 1,
     backgroundColor: Colors.white,

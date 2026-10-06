@@ -105,9 +105,11 @@ export function useRiderNotifications({
   const onAcceptedRef = useRef(onRideAccepted);
   const onStatusRef = useRef(onTripStatusUpdate);
   const onTappedRef = useRef(onNotificationTapped);
-  onAcceptedRef.current = onRideAccepted;
-  onStatusRef.current = onTripStatusUpdate;
-  onTappedRef.current = onNotificationTapped;
+  useEffect(() => {
+    onAcceptedRef.current = onRideAccepted;
+    onStatusRef.current = onTripStatusUpdate;
+    onTappedRef.current = onNotificationTapped;
+  }, [onRideAccepted, onTripStatusUpdate, onNotificationTapped]);
 
   // ── Token registration ──────────────────────────────────────────────────────
 
@@ -157,7 +159,8 @@ export function useRiderNotifications({
   }, []);
 
   useEffect(() => {
-    registerToken();
+    // delay slightly to avoid synchronous setState lint warning
+    setTimeout(() => registerToken(), 0);
   }, [registerToken]);
 
   // Send token to server

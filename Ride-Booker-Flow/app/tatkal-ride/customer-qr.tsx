@@ -151,7 +151,7 @@ export default function CustomerQRScreen() {
   }, []);
 
   // ── Shimmer animation for card ──
-  const shimmer = useRef(new Animated.Value(0)).current;
+  const [shimmer] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.loop(
       Animated.sequence([

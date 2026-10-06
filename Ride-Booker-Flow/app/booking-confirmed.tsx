@@ -14,7 +14,7 @@ import {
   Linking,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, AnimatedRegion } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -35,7 +35,7 @@ import { AutoIcon, ScootyIcon, SheBikeIcon, ParcelIcon } from "@/components/Vehi
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_STEPS = ["Driver arriving", "Ride started", "Reached destination"];
-const ETA_THROTTLE_MS = 15_000; // Throttle Distance Matrix API calls to once per 15 seconds
+const ETA_THROTTLE_MS = 5_000; // Throttle Distance Matrix API calls to once per 5 seconds
 
 // ─── Utility: bearing between two GPS points (degrees) ──────────────────────
 
@@ -123,6 +123,14 @@ export default function BookingConfirmedScreen() {
     latitude: pickup?.lat ? pickup.lat - 0.005 : 17.38,
     longitude: pickup?.lng ?? 78.4867,
   });
+
+  const driverCoordAnim = useRef(new AnimatedRegion({
+    latitude: pickup?.lat ? pickup.lat - 0.005 : (pickupCoord?.latitude || 17.38) - 0.005,
+    longitude: pickup?.lng ?? (pickupCoord?.longitude || 78.4867),
+    latitudeDelta: 0,
+    longitudeDelta: 0,
+  })).current;
+
   const [driverHeading, setDriverHeading] = useState(0);
 
   // Real online vehicles for searching phase
@@ -214,6 +222,12 @@ export default function BookingConfirmedScreen() {
     let startTime: number | null = null;
     const DURATION = 4000; // 4 seconds animation for smoother continuous movement
 
+    // Calculate distance to check if movement is significant (ignore GPS jitter < 3 meters)
+    const distanceMoved = Math.hypot(endLat - startLat, endLng - startLng) * 111000; // rough meters
+    if (distanceMoved < 3) {
+      return; // Driver hasn't moved enough, ignore this update to prevent dummy/jitter movement
+    }
+
     // --- Path Erasing & Auto-Reroute Logic (Run once per location update, NOT 60fps) ---
     const activePolylineSetter = currentStepRef.current === 0 ? setDriverToPickupCoords : setPickupToDropCoords;
     
@@ -254,28 +268,15 @@ export default function BookingConfirmedScreen() {
       setDriverHeading(calculatedHeading);
     }
 
-    const step = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / DURATION, 1);
-
-      // Ease out quad
-      const easeProgress = progress * (2 - progress);
-
-      const currentLat = startLat + (endLat - startLat) * easeProgress;
-      const currentLng = startLng + (endLng - startLng) * easeProgress;
-
-      driverCoordRef.current = { latitude: currentLat, longitude: currentLng };
-      setDriverCoord({ latitude: currentLat, longitude: currentLng });
-      
-      // Removed dynamic camera tracking to prevent map jumping
-
-      if (progress < 1) {
-        liveAnimIdRef.current = requestAnimationFrame(step);
-      }
-    };
-
-    liveAnimIdRef.current = requestAnimationFrame(step);
-  }, [dropCoord, pickupCoord]);
+    
+    driverCoordRef.current = { latitude: endLat, longitude: endLng };
+    driverCoordAnim.timing({
+      latitude: endLat,
+      longitude: endLng,
+      duration: DURATION,
+      useNativeDriver: false,
+    }).start();
+  }, [dropCoord, pickupCoord, driverCoordAnim]);
 
   // ─── Fetch routes & kick off subscriptions ─────────────────────────────────
 
@@ -296,16 +297,16 @@ export default function BookingConfirmedScreen() {
       setDriverToPickupCoords(finalDriverRoute);
       setPickupToDropCoords(rideRoute);
 
-      // Fit map to show pickup location closely, allowing user to zoom out manually
+      // Smoothly pan and zoom to pickup location so the user knows exactly where they are waiting
       if (mapRef.current && pickupCoord) {
         setTimeout(() => {
           mapRef.current?.animateCamera({
             center: pickupCoord,
-            zoom: 17,
+            zoom: 16.5,
             pitch: 0,
             heading: 0,
-          }, { duration: 1000 });
-        }, 500);
+          }, { duration: 2000 }); // 2 seconds for a very smooth glide (prevents abrupt jumps)
+        }, 300);
       }
 
       // ── Fetch initial ETA if we already have driver location ──
@@ -563,7 +564,7 @@ export default function BookingConfirmedScreen() {
 
             {/* Live driver marker with rotation */}
             {isConfirmed && (
-              <Marker coordinate={driverCoord} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
+              <Marker.Animated coordinate={driverCoordAnim as any} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
                 <View style={styles.liveDriverMarkerWrap}>
                   {selectedVehicle?.includes('auto') ? (
                     <Image source={require("@/assets/images/auto-logo.png")} style={{ width: 60, height: 60, resizeMode: "contain" }} />

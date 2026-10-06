@@ -4,7 +4,7 @@ import {
   Platform, Animated, Easing, Image
 } from "react-native";
 import { router } from "expo-router";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, AnimatedRegion } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -248,7 +248,7 @@ export default function RideMapScreen() {
           <>
             <Text style={s.sheetTitle}>Choose a ride</Text>
 
-            <BottomSheetScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 12 }}>
+            <BottomSheetScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, flexShrink: 1, marginTop: 12 }}>
               {vehicles.map((v) => {
                 const isSelected = v.id === selectedId;
                 return (
@@ -287,32 +287,34 @@ export default function RideMapScreen() {
               })}
             </BottomSheetScrollView>
 
-            <View style={s.promoBanner}>
-              <LinearGradient colors={['#FDF4FF', '#FCE7F3']} style={StyleSheet.absoluteFill} />
-              <MaterialCommunityIcons name="star-shooting" size={24} color="#DB2777" />
-              <Text style={s.promoText} numberOfLines={1}>Earn 10% back on every ride with Pro.</Text>
-              <Ionicons name="chevron-forward" size={20} color="#DB2777" />
-            </View>
-
-            <Pressable style={s.paymentRow}>
-              <View style={s.cashIcon}>
-                <Ionicons name="cash" size={20} color="#10B981" />
+            <View style={{ flexShrink: 0, backgroundColor: "#FFF", paddingTop: 8 }}>
+              <View style={s.promoBanner}>
+                <LinearGradient colors={['#FDF4FF', '#FCE7F3']} style={StyleSheet.absoluteFill} />
+                <MaterialCommunityIcons name="star-shooting" size={24} color="#DB2777" />
+                <Text style={s.promoText} numberOfLines={1}>Earn 10% back on every ride with Pro.</Text>
+                <Ionicons name="chevron-forward" size={20} color="#DB2777" />
               </View>
-              <Text style={s.paymentText}>Cash Payment</Text>
-              <Text style={s.paymentChange}>Change</Text>
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            </Pressable>
 
-            <View style={s.ctaRow}>
-              <Pressable style={s.ctaBtn} onPress={handleChoose}>
-                <LinearGradient colors={['#4F46E5', '#4338CA']} style={s.ctaGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <Text style={s.ctaBtnText}>Confirm {selected?.name ?? "Ride"}</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8 }} />
-                </LinearGradient>
+              <Pressable style={s.paymentRow}>
+                <View style={s.cashIcon}>
+                  <Ionicons name="cash" size={20} color="#10B981" />
+                </View>
+                <Text style={s.paymentText}>Cash Payment</Text>
+                <Text style={s.paymentChange}>Change</Text>
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
               </Pressable>
-              <Pressable style={s.scheduleBtn}>
-                <Ionicons name="time" size={24} color="#111827" />
-              </Pressable>
+
+              <View style={s.ctaRow}>
+                <Pressable style={s.ctaBtn} onPress={handleChoose}>
+                  <LinearGradient colors={['#4F46E5', '#4338CA']} style={s.ctaGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <Text style={s.ctaBtnText}>Confirm {selected?.name ?? "Ride"}</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8 }} />
+                  </LinearGradient>
+                </Pressable>
+                <Pressable style={s.scheduleBtn} onPress={handleChoose}>
+                  <Ionicons name="time" size={24} color="#111827" />
+                </Pressable>
+              </View>
             </View>
           </>
         )}

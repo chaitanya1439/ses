@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
+  Alert,
   View, Text, StyleSheet, Pressable, ScrollView, StatusBar,
-  Platform, Animated, Easing,
+  Platform, Animated, Easing, Modal
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import MapView, { Marker } from "react-native-maps";
@@ -72,6 +73,9 @@ export default function ConfirmPickupScreen() {
   const [spots, setSpots] = useState<PickupSpot[]>([]);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
+
   const [reverseAddress, setReverseAddress] = useState("");
 
   // Pulse animation for selected marker
@@ -193,7 +197,7 @@ export default function ConfirmPickupScreen() {
   };
 
   // ─── Step 6: Confirm ──────────────────────────────────────────────
-  const handleConfirm = async () => {
+  const handleConfirm = async (selectedTime: Date | null = scheduledTime) => {
     let finalLat = pickupLat;
     let finalLng = pickupLng;
     let finalName = reverseAddress || "Selected Location";
@@ -250,17 +254,27 @@ export default function ConfirmPickupScreen() {
       riderName: user?.name,
       distance: distanceKm,
       otp: dynamicOtp,
+      scheduledTime: selectedTime ? selectedTime.toISOString() : undefined,
       ...(params.parcelDetails ? { parcelDetails: JSON.parse(params.parcelDetails) } : {})
     };
 
-    // 4. Emit WebSocket for instant delivery to online drivers
-    sendMessage("ride_request", { payload: ridePayload });
-
-    // 5. Also send via HTTP (triggers push notifications for backgrounded drivers)
-    await requestRide(ridePayload);
-
-    // 6. Navigate
-    router.push("/driver-search" as any);
+    // 4. Submit ride
+    if (selectedTime) {
+      // For scheduled rides, only use HTTP which hits /api/schedule-ride
+      const res = await requestRide(ridePayload);
+      if (res.success) {
+        Alert.alert("Success", "Ride Scheduled successfully! You can view it in My Rides.");
+        router.dismissAll();
+        router.replace("/home" as any);
+      } else {
+        Alert.alert("Error", "Failed to schedule ride.");
+      }
+    } else {
+      // 5. Emit WebSocket for instant delivery to online drivers
+      sendMessage("ride_request", { payload: ridePayload });
+      await requestRide(ridePayload);
+      router.push("/driver-search" as any);
+    }
   };
 
   // ═════════════════════════════════════════════════════════════════
@@ -434,13 +448,62 @@ export default function ConfirmPickupScreen() {
         )}
 
         {/* CTA */}
-        <Pressable
-          style={[st.ctaBtn, isLoading && { opacity: 0.5 }]}
-          onPress={handleConfirm}
-          disabled={isLoading}
-        >
-          <Text style={st.ctaBtnText}>Confirm pickup</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Pressable 
+            style={[st.ctaBtn, { flex: 0.3, backgroundColor: Colors.lightGrey }]}
+            onPress={() => setShowSchedule(true)}
+          >
+            <Ionicons name="calendar-outline" size={24} color={Colors.dark} />
+          </Pressable>
+          <Pressable
+            style={[st.ctaBtn, { flex: 0.7 }, isLoading && { opacity: 0.5 }]}
+            onPress={() => handleConfirm()}
+            disabled={isLoading}
+          >
+            <Text style={st.ctaBtnText}>{scheduledTime ? `Schedule for ${scheduledTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Confirm pickup'}</Text>
+          </Pressable>
+        </View>
+        
+        {/* Simple Schedule Modal */}
+        {showSchedule && (
+          <Modal transparent visible={showSchedule} animationType="fade">
+            <Pressable style={st.modalOverlay} onPress={() => setShowSchedule(false)}>
+              <View style={st.scheduleBox}>
+                <Text style={st.sheetTitle}>Schedule Ride</Text>
+                <Text style={st.sheetSubtitle}>Choose a pickup time</Text>
+                
+                <View style={{ marginTop: 20, gap: 12 }}>
+                  {[30, 60, 120, 240].map((mins) => {
+                    const time = new Date(Date.now() + mins * 60000);
+                    return (
+                      <Pressable 
+                        key={mins}
+                        style={st.timeSlot}
+                        onPress={() => {
+                          setScheduledTime(time);
+                          setShowSchedule(false);
+                        }}
+                      >
+                        <Text style={st.timeSlotText}>
+                          {mins < 60 ? `In ${mins} mins` : `In ${mins/60} hours`} ({time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                  <Pressable 
+                    style={[st.timeSlot, { backgroundColor: '#FEE2E2' }]}
+                    onPress={() => {
+                      setScheduledTime(null);
+                      setShowSchedule(false);
+                    }}
+                  >
+                    <Text style={[st.timeSlotText, { color: '#DC2626' }]}>Clear Schedule</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </Pressable>
+          </Modal>
+        )}
       </View>
     </View>
   );
@@ -448,6 +511,10 @@ export default function ConfirmPickupScreen() {
 
 // ═════════════════════════════════════════════════════════════════════
 const st = StyleSheet.create({
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  scheduleBox: { width: '85%', backgroundColor: Colors.white, borderRadius: 16, padding: 24 },
+  timeSlot: { padding: 16, backgroundColor: Colors.lightGrey, borderRadius: 12, alignItems: 'center' },
+  timeSlotText: { fontSize: 16, fontFamily: "Poppins_500Medium", color: Colors.dark },
   container: { flex: 1, backgroundColor: Colors.white },
 
   // Map
