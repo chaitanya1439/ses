@@ -64,7 +64,6 @@ export default function ActiveRideScreen() {
   const riderId = (activeRide as any)?.riderId || activeRide?.customer?.id;
 
   useEffect(() => {
-    let locationSubscription: Location.LocationSubscription;
 
     const startTracking = async () => {
       if (!activeRide || !driver?.token) return;
@@ -88,26 +87,7 @@ export default function ActiveRideScreen() {
           });
         }
 
-        locationSubscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            distanceInterval: 10,
-            timeInterval: 2000,
-          },
-          (loc) => {
-            if (activeRide) {
-              sendThrottledMessage('location_update', {
-                riderId,
-                location: {
-                  lat: loc.coords.latitude,
-                  lng: loc.coords.longitude,
-                  heading: loc.coords.heading,
-                  speed: loc.coords.speed,
-                }
-              }, 2000);
-            }
-          }
-        );
+
       } catch (err) {
         console.error('Tracking Error:', err);
       }
@@ -116,9 +96,6 @@ export default function ActiveRideScreen() {
     startTracking();
 
     return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
       Location.stopLocationUpdatesAsync("BACKGROUND_LOCATION_TASK").catch(() => {});
     };
   }, [activeRide, driver, riderId, sendThrottledMessage]);
@@ -218,6 +195,7 @@ export default function ActiveRideScreen() {
           pickupLng={pickup.lng}
           dropLat={drop.lat}
           dropLng={drop.lng}
+          riderId={riderId}
         />
 
         {/* Top Controls Overlay */}

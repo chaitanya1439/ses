@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import * as ExpoLocation from 'expo-location';
 import { useSocket } from '@/context/SocketContext';
+import * as TaskManager from 'expo-task-manager';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -12,6 +13,9 @@ const LOCATION_INTERVAL_MS = 5_000;
 
 /** Throttle WebSocket emissions to prevent flooding the server. */
 const THROTTLE_MS = 2_000;
+
+/** The name of the background task defined in _layout.tsx */
+const BACKGROUND_LOCATION_TASK = "BACKGROUND_LOCATION_TASK";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -138,6 +142,9 @@ export function useLocationTracking({
         watchSubscriptionRef.current.remove();
         watchSubscriptionRef.current = null;
         setIsTracking(false);
+        ExpoLocation.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then(started => {
+          if (started) ExpoLocation.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(e => console.log(e));
+        });
         console.log('[Location] Tracking stopped');
       }
       return;
@@ -216,6 +223,23 @@ export function useLocationTracking({
         setIsTracking(true);
         setError(null);
         console.log('[Location] Tracking started with', distanceThreshold, 'm threshold');
+
+        // ALSO Start True Background Tracking
+        const bgStatus = await ExpoLocation.getBackgroundPermissionsAsync();
+        if (bgStatus.status === 'granted') {
+          await ExpoLocation.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+            accuracy: ExpoLocation.Accuracy.High,
+            timeInterval: LOCATION_INTERVAL_MS,
+            distanceInterval: 10,
+            showsBackgroundLocationIndicator: true,
+            foregroundService: {
+              notificationTitle: "RideGo Driver",
+              notificationBody: "Live tracking is active for your ride",
+              notificationColor: "#ff0000",
+            }
+          });
+          console.log('[Location] True background tracking started via TaskManager');
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to start location tracking';
         setError(msg);
@@ -231,6 +255,9 @@ export function useLocationTracking({
         watchSubscriptionRef.current.remove();
         watchSubscriptionRef.current = null;
       }
+      ExpoLocation.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then(started => {
+        if (started) ExpoLocation.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(e => console.log(e));
+      });
       setIsTracking(false);
     };
   }, [enabled, hasPermission, riderId, distanceThreshold, sendThrottledMessage]);

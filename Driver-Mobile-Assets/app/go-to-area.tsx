@@ -13,7 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { PROVIDER_GOOGLE, Marker, Polygon } from 'react-native-maps';
+import { GoToAreaMap } from '@/components/GoToAreaMap';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,13 +49,7 @@ export default function GoToAreaScreen() {
     setAreas((prev) => prev.filter((a) => a.id !== id));
   };
 
-  // Custom heart pin renderer for map (now a component for Marker)
-  const renderHeartPin = (scale: number = 1) => (
-    <View style={[styles.mapPin, { transform: [{ scale }] }]}>
-      <MaterialCommunityIcons name="map-marker-path" size={28} color="#E53935" style={{ position: 'absolute' }} />
-      <MaterialCommunityIcons name="heart" size={12} color="#FFFFFF" style={{ position: 'absolute', top: 5 }} />
-    </View>
-  );
+
 
   // Example rough coordinates for the teal polygon in Hyderabad
   const polygonCoords = [
@@ -88,41 +82,7 @@ export default function GoToAreaScreen() {
       >
         {/* ─── MAP SECTION ─── */}
         <View style={[styles.mapSection, { alignItems: 'stretch', justifyContent: 'flex-start' }]}>
-          <MapView userInterfaceStyle="light"
-            provider={PROVIDER_GOOGLE}
-            style={StyleSheet.absoluteFillObject}
-            initialRegion={{
-              latitude: 17.3850,
-              longitude: 78.4867,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={false}
-            showsCompass={false}
-          >
-            {/* Teal Zone Polygon */}
-            <Polygon
-              coordinates={polygonCoords}
-              fillColor="rgba(20, 184, 166, 0.2)"
-              strokeColor="#14B8A6"
-              strokeWidth={2}
-            />
-
-            {/* Scattered Map Pins */}
-            <Marker coordinate={{ latitude: 17.388, longitude: 78.482 }}>
-              {renderHeartPin(0.9)}
-            </Marker>
-            <Marker coordinate={{ latitude: 17.395, longitude: 78.491 }}>
-              {renderHeartPin(1.1)}
-            </Marker>
-            <Marker coordinate={{ latitude: 17.375, longitude: 78.478 }}>
-              {renderHeartPin(1.0)}
-            </Marker>
-            <Marker coordinate={{ latitude: 17.382, longitude: 78.498 }}>
-              {renderHeartPin(0.85)}
-            </Marker>
-          </MapView>
+          <GoToAreaMap polygonCoords={polygonCoords} />
           
           {/* Badge overlays the map (absolute positioning) */}
           <View style={styles.absoluteBadgeContainer}>
@@ -255,12 +215,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: 'Poppins_700Bold',
-  },
-  mapPin: {
-    width: 28,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   /* -- Info Banner -- */

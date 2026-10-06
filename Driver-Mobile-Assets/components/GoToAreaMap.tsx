@@ -3,12 +3,15 @@ import { View, StyleSheet, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/colors';
 
-export function HomeMap() {
+interface Props {
+  polygonCoords: any[];
+}
+
+export function GoToAreaMap({ polygonCoords }: Props) {
   return (
     <View style={styles.placeholderContainer}>
-      <MaterialCommunityIcons name="map" size={48} color={theme.colors.primary} />
-      <Text style={styles.text}>Map view available on mobile</Text>
-      <Text style={styles.sub}>Scan the QR code in Expo Go to see live maps</Text>
+      <MaterialCommunityIcons name="map-marker-radius" size={48} color={theme.colors.primary} />
+      <Text style={styles.text}>Map available on mobile</Text>
     </View>
   );
 }
@@ -22,16 +25,10 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   text: {
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 18,
+    fontFamily: 'Poppins_500Medium',
+    fontSize: 16,
     color: '#374151',
     marginTop: 16,
-  },
-  sub: {
-    fontFamily: 'Poppins_400Regular',
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 8,
     textAlign: 'center',
   },
 });

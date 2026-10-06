@@ -19,8 +19,13 @@
         "NSLocationWhenInUseUsageDescription": "RidePilot needs your location to find nearby rides.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "RidePilot needs background location to track rides.",
         "NSLocationAlwaysUsageDescription": "RidePilot needs background location to track rides.",
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ]
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.ridepilot",
@@ -39,6 +44,9 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "ACCESS_FINE_LOCATION",

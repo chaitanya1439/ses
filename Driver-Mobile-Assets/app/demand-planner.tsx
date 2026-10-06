@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { PROVIDER_GOOGLE, Marker, Heatmap } from 'react-native-maps';
+import { DemandPlannerMap } from '@/components/DemandPlannerMap';
 import { useSocket } from '@/context/SocketContext';
 
 const TIME_SLOTS = ['6 PM', '7 PM', '8 PM', '9 PM'];
@@ -68,40 +68,7 @@ export default function DemandPlannerScreen() {
 
       {/* ─── REAL MAP VIEW ─── */}
       <View style={[styles.mapContainer, { borderRadius: 16, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 }]}>
-        <MapView userInterfaceStyle="light"
-          provider={PROVIDER_GOOGLE}
-          style={StyleSheet.absoluteFillObject}
-          initialRegion={{
-            latitude: 17.3850, // Hyderabad
-            longitude: 78.4867,
-            latitudeDelta: 0.1,
-            longitudeDelta: 0.1,
-          }}
-          showsUserLocation={true}
-          showsMyLocationButton={false}
-          showsCompass={false}
-          customMapStyle={[]} // Can add aubergine/retro styling here later if needed
-        >
-          {/* Example blue dot marker for where the driver is if showsUserLocation isn't sufficient in emulator */}
-          <Marker coordinate={{ latitude: 17.3850, longitude: 78.4867 }}>
-            <View style={styles.blueDot}>
-              <View style={styles.blueDotInner} />
-            </View>
-          </Marker>
-
-          {heatmapPoints.length > 0 && Platform.OS !== 'web' && (
-            <Heatmap
-              points={heatmapPoints}
-              radius={40}
-              opacity={0.7}
-              gradient={{
-                colors: ["#00000000", "#00e400", "#ffff00", "#ff7e00", "#ff0000"],
-                startPoints: [0, 0.25, 0.5, 0.75, 1],
-                colorMapSize: 256
-              }}
-            />
-          )}
-        </MapView>
+        <DemandPlannerMap heatmapPoints={heatmapPoints} />
         {/* My Location button */}
         <Pressable
           style={styles.myLocationBtn}

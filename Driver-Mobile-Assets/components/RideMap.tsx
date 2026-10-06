@@ -10,9 +10,10 @@ interface Props {
   pickupLng: number;
   dropLat: number;
   dropLng: number;
+  riderId?: string;
 }
 
-export function RideMap({ pickupAddress, dropAddress }: Props) {
+export function RideMap({ pickupAddress, dropAddress, riderId }: Props) {
   return (
     <View style={styles.container}>
       <MaterialCommunityIcons name="map-marker-path" size={52} color={theme.colors.primary} />

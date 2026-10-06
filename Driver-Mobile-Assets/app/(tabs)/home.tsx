@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable,
+  View, Text, StyleSheet, Pressable, Platform, Alert,
 } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,6 +71,8 @@ export default function HomeScreen() {
   // === Location Tracking ===
   useLocationTracking({
     enabled: isOnDuty,
+    riderId: (activeRide as any)?.riderId || activeRide?.customer?.id,
+    distanceThreshold: activeRide ? 10 : 50,
   });
 
   // === Push Notifications ===
@@ -329,7 +332,7 @@ export default function HomeScreen() {
 
   const driverName = driver?.name?.split(' ')[0] || 'Driver';
 
-  const handleToggleDuty = (newStatus: boolean) => {
+  const handleToggleDuty = async (newStatus: boolean) => {
     if (newStatus) {
       const expiry = driver?.subscriptionExpiryDate;
       const earningLimit = driver?.subscriptionEarningLimit;
@@ -347,6 +350,15 @@ export default function HomeScreen() {
         alert(`You have reached your earning limit (₹${earningLimit}). Please upgrade your plan to continue earning.`);
         router.push('/subscription-plans' as any);
         return;
+      }
+
+      const hasShownAlert = await AsyncStorage.getItem('battery_opt_alert_shown');
+      if (!hasShownAlert && Platform.OS === 'android') {
+        Alert.alert(
+          "Important: Background Tracking",
+          "To keep tracking alive while using Google Maps, please go to your phone settings and set RidePilot to 'Unrestricted' or 'No Battery Restrictions'.",
+          [{ text: "OK, I will do it", onPress: () => AsyncStorage.setItem('battery_opt_alert_shown', 'true') }]
+        );
       }
     }
     setIsOnDuty(newStatus);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, Dimensions, Platform, Modal, Alert
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { MiniMap } from '@/components/MiniMap';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRide } from '@/context/RideContext';
@@ -29,7 +29,7 @@ export function RideRequestPopup() {
   const [seconds, setSeconds] = useState(COUNTDOWN_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof Animated.timing> | null>(null);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const [routeCoords, setRouteCoords] = useState<{latitude: number; longitude: number}[]>([]);
   const [driverLocation, setDriverLocation] = useState<{lat: number, lng: number} | null>(null);
 
@@ -198,51 +198,16 @@ export function RideRequestPopup() {
 
           {/* Mini Map inside Request Layout */}
           <View style={styles.miniMapContainer}>
-            <MapView userInterfaceStyle="light"
-              ref={mapRef}
-              style={StyleSheet.absoluteFillObject}
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-              initialRegion={{
-                latitude: (incomingRide.pickup.lat + incomingRide.drop.lat) / 2,
-                longitude: (incomingRide.pickup.lng + incomingRide.drop.lng) / 2,
-                latitudeDelta: Math.abs(incomingRide.pickup.lat - incomingRide.drop.lat) * 1.8 + 0.01,
-                longitudeDelta: Math.abs(incomingRide.pickup.lng - incomingRide.drop.lng) * 1.8 + 0.01,
-              }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              pitchEnabled={false}
-              rotateEnabled={false}
-            >
-              <Marker coordinate={{ latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng }} anchor={{ x: 0.5, y: 0.5 }} style={{ zIndex: 10 }}>
-                <View style={styles.dropSquare} />
-              </Marker>
-              <Marker coordinate={{ latitude: incomingRide.pickup.lat, longitude: incomingRide.pickup.lng }} anchor={{ x: 0.5, y: 0 }} style={{ zIndex: 20 }}>
-                <View style={[styles.markerLabel, { backgroundColor: theme.colors.dark }]}>
-                  <Text style={[styles.markerLabelText, { color: '#FFF' }]} numberOfLines={1}>{incomingRide.pickup.address.split(',')[0]}</Text>
-                </View>
-              </Marker>
-
-              {driverLocation && (
-                <>
-                  <Marker coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }} anchor={{ x: 0.5, y: 0.5 }} style={{ zIndex: 10 }}>
-                    <View style={styles.pickupDot} />
-                  </Marker>
-                  <Marker coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }} anchor={{ x: 0.5, y: 0 }} style={{ zIndex: 20 }}>
-                    <View style={styles.markerLabel}>
-                      <Text style={styles.markerLabelText} numberOfLines={1}>My Location</Text>
-                    </View>
-                  </Marker>
-                </>
-              )}
-
-              {routeCoords.length > 1 && (
-                <Polyline
-                  coordinates={routeCoords}
-                  strokeColor={theme.colors.dark}
-                  strokeWidth={4}
-                />
-              )}
-            </MapView>
+            <MiniMap
+              mapRef={mapRef}
+              pickupLat={incomingRide.pickup.lat}
+              pickupLng={incomingRide.pickup.lng}
+              dropLat={incomingRide.drop.lat}
+              dropLng={incomingRide.drop.lng}
+              pickupAddress={incomingRide.pickup.address}
+              driverLocation={driverLocation}
+              routeCoords={routeCoords}
+            />
           </View>
 
           {/* Locations & Price directly under the Map */}

@@ -14,6 +14,7 @@ interface Props {
   pickupLng: number;
   dropLat: number;
   dropLng: number;
+  riderId?: string;
 }
 
 // Decode Google Maps encoded polyline string into array of coordinates
@@ -89,7 +90,7 @@ async function fetchRoute(
   ];
 }
 
-export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
+export function RideMap({ pickupLat, pickupLng, dropLat, dropLng, riderId }: Props) {
   const [driverLocation, setDriverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pickupToDropRoute, setPickupToDropRoute] = useState<{ latitude: number; longitude: number }[]>([]);
   const { sendThrottledMessage } = useSocket();
@@ -112,6 +113,7 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
         const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setDriverLocation({ latitude: current.coords.latitude, longitude: current.coords.longitude });
         sendThrottledMessage('location_update', {
+          riderId,
           location: { lat: current.coords.latitude, lng: current.coords.longitude }
         }, 0);
 
@@ -122,6 +124,7 @@ export function RideMap({ pickupLat, pickupLng, dropLat, dropLng }: Props) {
             setDriverLocation(newLoc);
             // 🚀 Stream hardware GPS to the server during active rides
             sendThrottledMessage('location_update', {
+              riderId,
               location: { lat: loc.coords.latitude, lng: loc.coords.longitude }
             }, 3000);
 

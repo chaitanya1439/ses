@@ -344,13 +344,13 @@ export default function DriverScannerScreen() {
     setRetryCount(0);
     setManualCode("");
     setManualError("");
-  }, []);
+  }, [syncRide]);
 
   // ── Torch toggle ──
   const toggleTorch = useCallback(() => {
     setTorchOn((prev) => !prev);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, []);
+  }, [syncRide]);
 
   // ── Permission not granted state ──
   if (!permission?.granted) {

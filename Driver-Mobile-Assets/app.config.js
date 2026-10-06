@@ -19,7 +19,7 @@ function resolveGoogleServicesFile() {
     return googleServicesFile;
   }
 
-  const generatedDir = path.join(__dirname, '.expo');
+  const generatedDir = path.join(process.cwd(), '.expo');
   const generatedFile = path.join(generatedDir, 'google-services.generated.json');
 
   fs.mkdirSync(generatedDir, { recursive: true });

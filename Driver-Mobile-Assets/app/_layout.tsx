@@ -39,13 +39,15 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       if (driverSessionStr) {
         const driverSession = JSON.parse(driverSessionStr);
         if (driverSession.token) {
-          const res = await fetch("https://real.shelteric.com/api/location", {
+          const baseUrl = process.env.EXPO_PUBLIC_API_URL || "https://real.shelteric.com";
+          let res = await fetch(`${baseUrl}/api/location/update`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${driverSession.token}`
             },
             body: JSON.stringify({
+              driverId: driverSession.id,
               location: {
                 lat: loc.coords.latitude,
                 lng: loc.coords.longitude,
@@ -54,6 +56,40 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
               }
             })
           });
+
+          // Handle Token Expiration
+          if (res.status === 401) {
+            console.log("[TaskManager] Token expired, attempting refresh...");
+            const refreshRes = await fetch(`${baseUrl}/auth/refresh`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${driverSession.token}` }
+            });
+            if (refreshRes.ok) {
+              const refreshData = await refreshRes.json();
+              if (refreshData.token) {
+                driverSession.token = refreshData.token;
+                await AsyncStorage.setItem("driver_session", JSON.stringify(driverSession));
+                // Retry location post with new token
+                res = await fetch(`${baseUrl}/api/location/update`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${driverSession.token}`
+                  },
+                  body: JSON.stringify({
+                    driverId: driverSession.id,
+                    location: {
+                      lat: loc.coords.latitude,
+                      lng: loc.coords.longitude,
+                      speed: loc.coords.speed,
+                      heading: loc.coords.heading
+                    }
+                  })
+                });
+              }
+            }
+          }
+
           if (!res.ok) {
             console.log("[TaskManager] Background location post failed:", res.status);
           }
