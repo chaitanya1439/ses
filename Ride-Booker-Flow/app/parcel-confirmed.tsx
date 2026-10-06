@@ -153,8 +153,8 @@ export default function ParcelConfirmedScreen() {
   });
 
   const driverCoordAnim = useRef(new AnimatedRegion({
-    latitude: pickup?.lat ? pickup.lat - 0.005 : (pickupCoord?.latitude || 17.38) - 0.005,
-    longitude: pickup?.lng ?? (pickupCoord?.longitude || 78.4867),
+    latitude: pickup?.lat ? pickup.lat - 0.005 : 17.38 - 0.005,
+    longitude: pickup?.lng ?? 78.4867,
     latitudeDelta: 0,
     longitudeDelta: 0,
   })).current;
@@ -258,7 +258,7 @@ export default function ParcelConfirmedScreen() {
         const lat = from.latitude + (to.latitude - from.latitude) * p;
         const lng = from.longitude + (to.longitude - from.longitude) * p;
 
-        driverCoordAnim.timing({ latitude: lat, longitude: lng, duration: 4000, useNativeDriver: false }).start();
+        driverCoordAnim.timing({ latitude: lat, longitude: lng, duration: 4000, useNativeDriver: false } as any).start();
         setDriverHeading(getBearing(from, to));
 
         // Prepend the interpolated driver position to the polyline so there's
@@ -275,76 +275,52 @@ export default function ParcelConfirmedScreen() {
     [dropCoord, pickupCoord],
   );
 
-  // Smooth animation for REAL GPS updates
   const animateLiveLocation = useCallback((newLoc: { lat: number; lng: number; heading?: number }) => {
-    setDriverCoord(prevCoord => {
-      if (liveAnimIdRef.current) {
-        cancelAnimationFrame(liveAnimIdRef.current);
+    const endLat = newLoc.lat;
+    const endLng = newLoc.lng;
+
+    driverCoordAnim.timing({
+      latitude: endLat,
+      longitude: endLng,
+      duration: 4000,
+      useNativeDriver: false
+    } as any).start();
+
+    // --- Path Erasing & Auto-Reroute Logic (Run once per location update, NOT 60fps) ---
+    const activePolylineSetter = currentStepRef.current === 0 ? setDriverToPickupCoords : setPickupToDropCoords;
+    
+    activePolylineSetter(prevPoly => {
+      if (!prevPoly || prevPoly.length < 2) return prevPoly;
+      
+      let minIndex = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < Math.min(prevPoly.length, 15); i++) {
+        const pt = prevPoly[i];
+        const dist = Math.hypot(pt.latitude - newLoc.lat, pt.longitude - newLoc.lng);
+        if (dist < minDist) {
+          minDist = dist;
+          minIndex = i;
+        }
       }
-
-      const startLat = prevCoord.latitude;
-      const startLng = prevCoord.longitude;
-      const endLat = newLoc.lat;
-      const endLng = newLoc.lng;
-
-      let startTime: number | null = null;
-      const DURATION = 4000; // 4 seconds animation for smoother continuous movement
-
-        // --- Path Erasing & Auto-Reroute Logic (Run once per location update, NOT 60fps) ---
-        const activePolylineSetter = currentStepRef.current === 0 ? setDriverToPickupCoords : setPickupToDropCoords;
-        
-        activePolylineSetter(prevPoly => {
-          if (!prevPoly || prevPoly.length < 2) return prevPoly;
-          
-          let minIndex = 0;
-          let minDist = Infinity;
-          for (let i = 0; i < Math.min(prevPoly.length, 15); i++) {
-            const pt = prevPoly[i];
-            const dist = Math.hypot(pt.latitude - newLoc.lat, pt.longitude - newLoc.lng);
-            if (dist < minDist) {
-              minDist = dist;
-              minIndex = i;
-            }
-          }
-          
-          // Auto-reroute if the driver is completely off the current path (> ~15m)
-          if (minDist > 0.00015) {
-            const now = Date.now();
-            if (now - lastRerouteTimeRef.current > 5000) { // Throttle reroute to once every 5s
-              lastRerouteTimeRef.current = now;
-              const dest = currentStepRef.current === 0 ? pickupCoord : dropCoord;
-              fetchDirectionsPolyline({ latitude: newLoc.lat, longitude: newLoc.lng }, dest).then(newRoute => {
-                if (newRoute && newRoute.length > 0) {
-                  activePolylineSetter(newRoute);
-                }
-              });
-            }
-          }
-          
-          const newPolyline = [{ latitude: newLoc.lat, longitude: newLoc.lng }, ...prevPoly.slice(minIndex + 1)];
-          return newPolyline.length > 1 ? newPolyline : prevPoly;
-        });
-
-        const calculatedHeading = getBearing({ latitude: startLat, longitude: startLng }, { latitude: endLat, longitude: endLng });
-        if (Math.abs(endLat - startLat) > 0.00001 || Math.abs(endLng - startLng) > 0.00001) {
-          setDriverHeading(calculatedHeading);
-        }
-
       
-        
-        // Removed dynamic camera tracking to prevent map jumping
-
-        if (progress < 1) {
-          
+      // Auto-reroute if the driver is completely off the current path (> ~15m)
+      if (minDist > 0.00015) {
+        const now = Date.now();
+        if (now - lastRerouteTimeRef.current > 5000) { // Throttle reroute to once every 5s
+          lastRerouteTimeRef.current = now;
+          const dest = currentStepRef.current === 0 ? pickupCoord : dropCoord;
+          fetchDirectionsPolyline({ latitude: newLoc.lat, longitude: newLoc.lng }, dest).then(newRoute => {
+            if (newRoute && newRoute.length > 0) {
+              activePolylineSetter(newRoute);
+            }
+          });
         }
-      };
-
+      }
       
-
-      // Return prevCoord to immediately satisfy the state update, actual animation happens in loop
-      return prevCoord;
+      const newPolyline = [{ latitude: newLoc.lat, longitude: newLoc.lng }, ...prevPoly.slice(minIndex + 1)];
+      return newPolyline.length > 1 ? newPolyline : prevPoly;
     });
-  }, [dropCoord, pickupCoord]);
+  }, [dropCoord, pickupCoord, driverCoordAnim]);
 
   // ─── Fetch routes & kick off animation ───────────────────────────────────────
 

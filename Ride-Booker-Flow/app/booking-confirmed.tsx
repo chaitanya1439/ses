@@ -125,8 +125,8 @@ export default function BookingConfirmedScreen() {
   });
 
   const driverCoordAnim = useRef(new AnimatedRegion({
-    latitude: pickup?.lat ? pickup.lat - 0.005 : (pickupCoord?.latitude || 17.38) - 0.005,
-    longitude: pickup?.lng ?? (pickupCoord?.longitude || 78.4867),
+    latitude: pickup?.lat ? pickup.lat - 0.005 : 17.38 - 0.005,
+    longitude: pickup?.lng ?? 78.4867,
     latitudeDelta: 0,
     longitudeDelta: 0,
   })).current;
@@ -275,7 +275,7 @@ export default function BookingConfirmedScreen() {
       longitude: endLng,
       duration: DURATION,
       useNativeDriver: false,
-    }).start();
+    } as any).start();
   }, [dropCoord, pickupCoord, driverCoordAnim]);
 
   // ─── Fetch routes & kick off subscriptions ─────────────────────────────────

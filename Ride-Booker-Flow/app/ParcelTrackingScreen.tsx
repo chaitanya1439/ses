@@ -111,7 +111,7 @@ export default function ParcelTrackingScreen() {
 
     const unsubLoc = subscribe("DRIVER_LOCATION", (data) => {
       if (data.lat && data.lng) {
-        driverCoordAnim.timing({ latitude: data.lat, longitude: data.lng, duration: 4000, useNativeDriver: false }).start();
+        driverCoordAnim.timing({ latitude: data.lat, longitude: data.lng, duration: 4000, useNativeDriver: false } as any).start();
       }
     });
 
