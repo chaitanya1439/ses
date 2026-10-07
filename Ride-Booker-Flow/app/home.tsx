@@ -73,10 +73,35 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { setPickup, setDrop, activeTrip } = useBooking();
   const location = useCurrentLocation();
-
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scheduledTrip, setScheduledTrip] = useState<any | null>(null);
+
+  // Fetch upcoming scheduled rides
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchScheduled = () => {
+      fetch(`https://real.shelteric.com/api/rider/history/${user.id}`)
+        .then(res => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const upcoming = data.filter(r => r.status === 'scheduled' && new Date(r.scheduledTime) > new Date());
+            upcoming.sort((a, b) => new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime());
+            if (upcoming.length > 0) {
+              setScheduledTrip(upcoming[0]);
+            } else {
+              setScheduledTrip(null);
+            }
+          }
+        })
+        .catch(err => console.error("Failed to fetch scheduled rides", err));
+    };
+    fetchScheduled();
+    // Poll every 30 seconds
+    const interval = setInterval(fetchScheduled, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
   const [isServicesExpanded, setIsServicesExpanded] = useState(true);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -278,6 +303,26 @@ export default function HomeScreen() {
           </Pressable>
         )}
       </View>
+
+
+        {/* Scheduled Trip Banner */}
+        {scheduledTrip && (!activeTrip || activeTrip.status === "completed") && (
+          <Pressable 
+            style={[styles.activeTripBanner, { backgroundColor: '#1E40AF', marginTop: 10 }]} 
+            onPress={() => router.push('/my-rides')}
+          >
+            <View style={styles.activeTripContent}>
+              <Ionicons name="calendar" size={24} color={Colors.white} />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.activeTripTitle}>Scheduled Ride</Text>
+                <Text style={styles.activeTripSub}>
+                  At {new Date(scheduledTrip.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.white} />
+            </View>
+          </Pressable>
+        )}
 
       {/* Scrollable Bottom Sheet Overlay */}
       <BottomSheet

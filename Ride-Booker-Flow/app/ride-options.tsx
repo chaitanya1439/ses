@@ -1,3 +1,4 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Alert,
@@ -493,46 +494,22 @@ export default function RideOptionsScreen() {
         </View>
       </Modal>
     
-      {/* Schedule Modal */}
+      
+      {/* Schedule Picker */}
       {showSchedule && (
-        <Modal transparent visible={showSchedule} animationType="fade">
-          <Pressable style={styles.overlay} onPress={() => setShowSchedule(false)}>
-            <View style={styles.scheduleBox}>
-              <Text style={styles.upsellTitle}>Schedule Ride</Text>
-              <Text style={styles.upsellSubtitle}>Choose a pickup time</Text>
-              
-              <View style={{ marginTop: 20, gap: 12 }}>
-                {[30, 60, 120, 240].map((mins) => {
-                  const time = new Date(Date.now() + mins * 60000);
-                  return (
-                    <Pressable 
-                      key={mins}
-                      style={styles.timeSlot}
-                      onPress={() => {
-                        setScheduledTime(time);
-                        setShowSchedule(false);
-                      }}
-                    >
-                      <Text style={styles.timeSlotText}>
-                        {mins < 60 ? `In ${mins} mins` : `In ${mins/60} hours`} ({time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-                <Pressable 
-                  style={[styles.timeSlot, { backgroundColor: '#FEE2E2' }]}
-                  onPress={() => {
-                    setScheduledTime(null);
-                    setShowSchedule(false);
-                  }}
-                >
-                  <Text style={[styles.timeSlotText, { color: '#DC2626' }]}>Clear Schedule</Text>
-                </Pressable>
-              </View>
-            </View>
-          </Pressable>
-        </Modal>
+        <DateTimePicker
+          value={scheduledTime || new Date(Date.now() + 30 * 60000)}
+          mode="time"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowSchedule(false);
+            if (event.type === 'set' && selectedDate) {
+              setScheduledTime(selectedDate);
+            }
+          }}
+        />
       )}
+
     </View>
   );
 }
