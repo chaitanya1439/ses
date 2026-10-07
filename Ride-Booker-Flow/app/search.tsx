@@ -167,7 +167,10 @@ export default function SearchScreen() {
       if (params.returnTo) {
         router.back();
       } else {
-        router.push("/ride-map" as any);
+        router.push({
+          pathname: "/ride-map" as any,
+          params: (params as any).isTatkal ? { isTatkal: "true" } : undefined
+        });
       }
     }
   };
@@ -190,7 +193,10 @@ export default function SearchScreen() {
       if (params.returnTo) {
         router.back();
       } else {
-        router.push("/ride-map" as any);
+        router.push({
+          pathname: "/ride-map" as any,
+          params: (params as any).isTatkal ? { isTatkal: "true" } : undefined
+        });
       }
     }
   };

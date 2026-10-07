@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, Pressable, ScrollView, StatusBar,
   Platform, Animated, Easing, Image
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import MapView, { Marker, Polyline, AnimatedRegion } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -90,6 +90,8 @@ function VehicleIcon({ item, size = 32 }: { item: VehicleOption; size?: number }
 export default function RideMapScreen() {
   const insets = useSafeAreaInsets();
   const { pickup, drop, setSelectedVehicle, setFare, setRouteDetails } = useBooking();
+  const params = useLocalSearchParams();
+  const isTatkal = params.isTatkal === "true";
   const [selectedId, setSelectedId] = useState("bike-saver");
   const mapRef = useRef<MapView>(null);
 
@@ -137,7 +139,9 @@ export default function RideMapScreen() {
     if (directions) {
       setRouteDetails({ distanceMeters: directions.distanceMeters, durationSeconds: directions.durationSeconds });
     }
-    if (selected.id === "parcel-bike" || selected.id === "parcel") {
+    if (isTatkal) {
+      router.push("/tatkal-ride/customer-qr" as any);
+    } else if (selected.id === "parcel-bike" || selected.id === "parcel") {
       router.push("/review-delivery" as any);
     } else {
       router.push("/confirm-pickup");
@@ -307,8 +311,8 @@ export default function RideMapScreen() {
               <View style={s.ctaRow}>
                 <Pressable style={s.ctaBtn} onPress={handleChoose}>
                   <LinearGradient colors={['#4F46E5', '#4338CA']} style={s.ctaGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                    <Text style={s.ctaBtnText}>Confirm {selected?.name ?? "Ride"}</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8 }} />
+                    <Text style={s.ctaBtnText}>{isTatkal ? "Generate Tatkal QR" : `Confirm ${selected?.name ?? "Ride"}`}</Text>
+                    <Ionicons name={isTatkal ? "qr-code-outline" : "arrow-forward"} size={20} color="#FFF" style={{ marginLeft: 8 }} />
                   </LinearGradient>
                 </Pressable>
                 <Pressable style={s.scheduleBtn} onPress={handleChoose}>
