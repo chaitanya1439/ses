@@ -264,7 +264,7 @@ export default function BookingConfirmedScreen() {
     });
 
     const calculatedHeading = getBearing({ latitude: startLat, longitude: startLng }, { latitude: endLat, longitude: endLng });
-    if (Math.abs(endLat - startLat) > 0.00001 || Math.abs(endLng - startLng) > 0.00001) {
+    if (Math.abs(endLat - startLat) > 0.00005 || Math.abs(endLng - startLng) > 0.00005) {
       setDriverHeading(calculatedHeading);
     }
 
@@ -564,7 +564,7 @@ export default function BookingConfirmedScreen() {
 
             {/* Live driver marker with rotation */}
             {isConfirmed && (
-              <Marker.Animated coordinate={driverCoordAnim as any} zIndex={30} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }}>
+              <Marker.Animated coordinate={driverCoordAnim as any} zIndex={999} flat rotation={driverHeading} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
                 <View style={styles.liveDriverMarkerWrap}>
                   {selectedVehicle?.includes('auto') ? (
                     <Image source={require("@/assets/images/auto-logo.png")} style={{ width: 60, height: 60, resizeMode: "contain" }} />

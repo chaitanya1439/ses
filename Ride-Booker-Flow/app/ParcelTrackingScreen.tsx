@@ -189,7 +189,7 @@ export default function ParcelTrackingScreen() {
 
             {/* Real-time Driver Marker */}
             {driverCoords && (
-              <Marker.Animated coordinate={driverCoordAnim as any}>
+              <Marker.Animated coordinate={driverCoordAnim as any} tracksViewChanges={false}>
                 <View style={styles.driverMarker}>
                   <MaterialCommunityIcons
                     name="bike"
