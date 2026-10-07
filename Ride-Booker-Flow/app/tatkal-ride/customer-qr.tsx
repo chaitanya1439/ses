@@ -10,6 +10,7 @@ import {
   Platform,
   Share,
   ScrollView,
+  Modal,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -59,7 +60,7 @@ export default function CustomerQRScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { pickup, drop, selectedVehicle, fare } = useBooking();
-  const { subscribe, isConnected } = useSocket();
+  const { subscribe, isConnected, sendMessage } = useSocket();
   const params = useLocalSearchParams();
 
   // ── Generate unique booking payload & code ──
@@ -114,13 +115,23 @@ export default function CustomerQRScreen() {
     };
   }, []);
 
-  // ── Listen for tatkal_ride_started event from driver scan ──
+  
+  // ── Listen for tatkal events from driver scan ──
   const [rideStarted, setRideStarted] = useState(false);
+  const [consentPayload, setConsentPayload] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const unsub = subscribe("tatkal_ride_started", (payload: any) => {
+    const unsubReq = subscribe("tatkal_consent_request", (payload: any) => {
       if (payload?.bookingId === bookingId || payload?.code === fallbackCode) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setConsentPayload(payload);
+      }
+    });
+
+    const unsubStart = subscribe("tatkal_ride_started", (payload: any) => {
+      if (payload?.bookingId === bookingId || payload?.code === fallbackCode) {
+        setConsentPayload(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setRideStarted(true);
         Animated.timing(fadeAnim, {
@@ -128,7 +139,6 @@ export default function CustomerQRScreen() {
           duration: 600,
           useNativeDriver: true,
         }).start(() => {
-          // Navigate to booking confirmed after brief success display
           setTimeout(() => {
             router.replace({
               pathname: "/booking-confirmed",
@@ -138,10 +148,15 @@ export default function CustomerQRScreen() {
         });
       }
     });
-    return () => unsub();
+
+    return () => {
+      unsubReq();
+      unsubStart();
+    };
   }, [subscribe, bookingId, fallbackCode, fadeAnim]);
 
-  // ── QR code expired? ──
+
+// ── QR code expired? ──
   const [expired, setExpired] = useState(false);
   const handleExpired = useCallback(() => setExpired(true), []);
   const handleRegenerate = useCallback(() => {
@@ -300,7 +315,46 @@ export default function CustomerQRScreen() {
         </Text>
       </View>
       </ScrollView>
-    </View>
+    
+      {/* ── Consent Modal ── */}
+      {consentPayload && (
+        <Modal transparent visible={!!consentPayload} animationType="fade">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ width: '85%', backgroundColor: Colors.white, borderRadius: 20, padding: 24, alignItems: 'center' }}>
+              <Ionicons name="shield-checkmark" size={48} color={Colors.primary} style={{ marginBottom: 16 }} />
+              <Text style={{ fontSize: 20, fontFamily: 'Poppins_700Bold', color: Colors.dark, textAlign: 'center', marginBottom: 8 }}>
+                Ride Request
+              </Text>
+              <Text style={{ fontSize: 16, fontFamily: 'Poppins_400Regular', color: Colors.grey, textAlign: 'center', marginBottom: 24 }}>
+                <Text style={{ fontFamily: 'Poppins_600SemiBold', color: Colors.dark }}>{consentPayload.driverName}</Text> wants to start a Tatkal ride for <Text style={{ fontFamily: 'Poppins_600SemiBold', color: Colors.accent }}>₹{consentPayload.fare || 'Standard Fare'}</Text>. Do you accept?
+              </Text>
+              
+              <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+                <Pressable 
+                  style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: Colors.lightGrey, alignItems: 'center' }}
+                  onPress={() => {
+                    sendMessage("tatkal_consent_reject", { payload: consentPayload });
+                    setConsentPayload(null);
+                  }}
+                >
+                  <Text style={{ fontSize: 16, fontFamily: 'Poppins_600SemiBold', color: Colors.grey }}>Decline</Text>
+                </Pressable>
+                
+                <Pressable 
+                  style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center' }}
+                  onPress={() => {
+                    sendMessage("tatkal_consent_accept", { payload: consentPayload });
+                    // Keep modal open or show loading state until 'tatkal_ride_started' is received
+                  }}
+                >
+                  <Text style={{ fontSize: 16, fontFamily: 'Poppins_600SemiBold', color: Colors.white }}>Accept</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+</View>
   );
 }
 
