@@ -103,6 +103,7 @@ export default function BookingConfirmedScreen() {
     } : null
   );
   
+    const bottomSheetRef = useRef<BottomSheet>(null);
   const progressAnim = useRef(new RNAnimated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
 
@@ -277,6 +278,15 @@ export default function BookingConfirmedScreen() {
       useNativeDriver: false,
     } as any).start();
   }, [dropCoord, pickupCoord, driverCoordAnim]);
+
+  
+  useEffect(() => {
+    if (isConfirmed) {
+      setTimeout(() => {
+        bottomSheetRef.current?.snapToIndex(0);
+      }, 100);
+    }
+  }, [isConfirmed]);
 
   // ─── Fetch routes & kick off subscriptions ─────────────────────────────────
 
@@ -608,7 +618,7 @@ export default function BookingConfirmedScreen() {
 
       {/* ── Unified Bottom Sheet ── */}
       <BottomSheet
-        snapPoints={isConfirmed ? ["45%", "65%", "90%"] : ["30%"]}
+        snapPoints={isConfirmed ? ["45%", "65%", "90%"] : ["30%"]} ref={bottomSheetRef}
         index={0}
         handleIndicatorStyle={{ backgroundColor: Colors.mediumGrey, width: 40 }}
         backgroundStyle={styles.bottomSheetBackground}

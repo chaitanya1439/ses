@@ -135,6 +135,7 @@ export default function ParcelConfirmedScreen() {
     } : null
   );
   
+    const bottomSheetRef = useRef<BottomSheet>(null);
   const progressAnim = useRef(new RNAnimated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
 
@@ -647,7 +648,7 @@ export default function ParcelConfirmedScreen() {
 
       {/* ── Unified Bottom Sheet ── */}
       <BottomSheet
-        snapPoints={isConfirmed ? ["45%", "65%", "90%"] : ["30%"]}
+        snapPoints={isConfirmed ? ["45%", "65%", "90%"] : ["30%"]} ref={bottomSheetRef}
         index={0}
         handleIndicatorStyle={{ backgroundColor: Colors.mediumGrey, width: 40 }}
         backgroundStyle={styles.bottomSheetBackground}
