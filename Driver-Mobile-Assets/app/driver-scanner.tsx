@@ -26,7 +26,7 @@ import { useRide } from "@/context/RideContext";
 import { openGoogleMapsNavigation } from "@/utils/maps";
 
 // ─── Types ───────────────────────────────────────────────────────────
-type ScreenState = "scanning" | "processing" | "success" | "error";
+type ScreenState = "scanning" | "processing" | "waiting_consent" | "success" | "error";
 
 interface ScannedPayload {
   type: string;
@@ -241,7 +241,20 @@ export default function DriverScannerScreen() {
 
   // ── Listen for ride confirmation from server ──
   useEffect(() => {
-    const unsub = subscribe("tatkal_ride_confirmed", (payload: any) => {
+    const unsubPending = subscribe("tatkal_consent_pending", () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      setScreenState("waiting_consent");
+    });
+
+    const unsubRejected = subscribe("tatkal_consent_rejected", () => {
+      setScreenState("error");
+      Alert.alert("Declined", "Rider declined the ride.");
+    });
+
+    const unsubStarted = subscribe("tatkal_ride_started", (payload: any) => {
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
@@ -300,7 +313,9 @@ export default function DriverScannerScreen() {
     });
 
     return () => {
-      unsub();
+      unsubPending();
+      unsubRejected();
+      unsubStarted();
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
       }
@@ -379,16 +394,18 @@ export default function DriverScannerScreen() {
   }
 
   // ── Processing state ──
-  if (screenState === "processing") {
+  if (screenState === "processing" || screenState === "waiting_consent") {
     return (
       <View style={[s.container, s.centeredContent, { paddingTop: insets.top }]}>
         <StatusBar barStyle="dark-content" backgroundColor={theme.colors.surface} />
         <ProcessingOverlay />
-        {retryCount > 1 && (
+        {screenState === "waiting_consent" ? (
+          <Text style={s.retryText}>Waiting for Rider to accept...</Text>
+        ) : retryCount > 1 ? (
           <Text style={s.retryText}>
             Syncing... attempt {retryCount}/{MAX_RETRIES}
           </Text>
-        )}
+        ) : null}
       </View>
     );
   }

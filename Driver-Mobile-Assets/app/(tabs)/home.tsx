@@ -110,7 +110,8 @@ export default function HomeScreen() {
           fare: data.fare ? Number(data.fare) : 150,
           type: data.vehicleType || 'Bike',
           riderId: data.riderId,
-          otp: data.otp || '1234'
+          otp: data.otp || '1234',
+          parcelDetails: data.parcelDetails
         };
         setIncomingRide(ride as any);
         setShowRidePopup(true);
@@ -148,7 +149,8 @@ export default function HomeScreen() {
           fare: data.fare ? Number(data.fare) : 150,
           type: data.vehicleType || 'Bike',
           riderId: data.riderId,
-          otp: data.otp || '1234'
+          otp: data.otp || '1234',
+          parcelDetails: data.parcelDetails
         };
         setIncomingRide(ride as any);
         setShowRidePopup(true);
@@ -265,7 +267,8 @@ export default function HomeScreen() {
         fare: data.fare ? Number(data.fare) : 150,
         type: data.vehicle || data.vehicleType || 'Bike',
         riderId: data.riderId,
-        otp: data.otp || '1234'
+        otp: data.otp || '1234',
+        parcelDetails: data.parcelDetails
       };
       setIncomingRide(ride as any);
       setShowRidePopup(true);
